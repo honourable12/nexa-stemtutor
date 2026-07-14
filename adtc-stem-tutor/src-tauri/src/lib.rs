@@ -36,18 +36,35 @@ async fn stream_stem_tutor_inference(
         let backend = get_backend();
 
         // 1. Load model with zero GPU layers (Integrated graphics only)
-        let model_path = Path::new("model/phi-3.5-mini-instruct-q4_k_m.gguf");
+        // Dynamically check multiple directory locations to ensure robustness across different running directories
+        let mut model_path = Path::new("model/phi-3.5-mini-instruct-q4_k_m.gguf").to_path_buf();
         if !model_path.exists() {
-            return Err(format!(
-                "Model file not found at {:?}. Please download `phi-3.5-mini-instruct-q4_k_m.gguf` (2.43 GB) and place it in the `model/` folder.",
-                model_path.canonicalize().unwrap_or(model_path.to_path_buf())
-            ));
+            let alt_paths = [
+                "../model/phi-3.5-mini-instruct-q4_k_m.gguf",
+                "../../model/phi-3.5-mini-instruct-q4_k_m.gguf",
+                "src-tauri/model/phi-3.5-mini-instruct-q4_k_m.gguf",
+                "../src-tauri/model/phi-3.5-mini-instruct-q4_k_m.gguf",
+            ];
+            let mut found = false;
+            for path_str in &alt_paths {
+                let p = Path::new(path_str);
+                if p.exists() {
+                    model_path = p.to_path_buf();
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return Err(format!(
+                    "Model file not found. Checked 'model/', '../model/', and 'src-tauri/model/'. Please run download_model.sh to fetch the 2.43 GB GGUF model weights."
+                ));
+            }
         }
 
         let model_params = LlamaModelParams::default()
             .with_n_gpu_layers(0); // Pinned to integrated graphics
         
-        let model = LlamaModel::load_from_file(backend, model_path, &model_params)
+        let model = LlamaModel::load_from_file(backend, &model_path, &model_params)
             .map_err(|e| format!("Failed to load model: {:?}", e))?;
 
         // 2. Configure Context parameters

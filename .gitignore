@@ -1,0 +1,24 @@
+# ADTC 2026 Laptop LLM Challenge gitignore
+
+# Model weights
+/model/
+*.gguf
+
+# SvelteKit dev & build dependencies
+/adtc-stem-tutor/node_modules/
+/adtc-stem-tutor/.svelte-kit/
+/adtc-stem-tutor/build/
+
+# Rust/Tauri build directories
+/adtc-stem-tutor/src-tauri/target/
+
+# OS/Editor specific
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
