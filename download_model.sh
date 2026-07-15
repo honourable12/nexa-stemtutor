@@ -1,20 +1,12 @@
 #!/usr/bin/env bash
-# Download your model weight file.
-#
-# Rules:
-#   - Must be idempotent (safe to run multiple times).
-#   - Must download without any credentials (public URL only).
-#   - The output path must match `_runtime.model_path` in metadata.json.
 
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL_DIR="$HERE/model"
-MODEL_FILE="$MODEL_DIR/phi-3.5-mini-instruct-q4_k_m.gguf"
+MODEL_FILE="$MODEL_DIR/Qwen3.5-4B-Q4_K_M.gguf"
 
-# ── Replace this URL with your public model weight URL ─────────────────────────
-MODEL_URL="https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf"
-# ───────────────────────────────────────────────────────────────────────────────
+MODEL_URL="https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf"
 
 mkdir -p "$MODEL_DIR"
 
@@ -23,7 +15,7 @@ if [[ -f "$MODEL_FILE" ]]; then
   exit 0
 fi
 
-echo "downloading $MODEL_URL → $MODEL_FILE (~2.4 GB)…"
+echo "downloading $MODEL_URL → $MODEL_FILE (~2.9 GB)…"
 
 if command -v curl > /dev/null 2>&1; then
   curl -L --fail --progress-bar -o "$MODEL_FILE.partial" "$MODEL_URL"

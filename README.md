@@ -9,7 +9,7 @@ This project is a submission for the **Africa Deep Tech Challenge (ADTC) 2026** 
 ## 🚀 Key Features
 
 *   **100% Offline Inference:** Zero external network dependencies or APIs.
-*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Phi-3.5-mini-instruct-Q4_K_M` model (3.8B parameters).
+*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Qwen3.5-4B-Q4_K_M` model (4B parameters).
 *   **Real-time 2D Lab Simulations:**
     *   **Electromagnetism (Solenoid):** Adjust turns, current, and core permeability to see dynamic magnetic flux vector lines.
     *   **Pendulum Swing Period:** Adjust gravity and length to visualize simple harmonic motion, comparing theoretical small-angle periods with actual elliptic integrals.
@@ -46,8 +46,7 @@ From the **root folder** of the project repository (which contains `download_mod
 ```bash
 bash download_model.sh
 ```
-This script will download the `Phi-3.5-mini-instruct-Q4_K_M.gguf` file (~2.4 GB) from Hugging Face and place it in the `model/` directory.
-*(Note: Do not commit the `.gguf` file to Git; the `.gitignore` at the root will automatically ignore it.)*
+This script will download the `Qwen3.5-4B-Q4_K_M.gguf` file (~2.9 GB) from Hugging Face and place it in the `model/` directory.
 
 ### 2. Install Frontend Dependencies
 Navigate into the `adtc-stem-tutor` folder and install NPM packages:
