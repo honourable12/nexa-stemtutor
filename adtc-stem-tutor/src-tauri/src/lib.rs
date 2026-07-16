@@ -24,7 +24,6 @@ struct TokenPayload {
     token: String,
 }
 
-// Helper to systematically find the downloaded GGUF file
 fn locate_model_file() -> Result<PathBuf, String> {
     let target_filename = "Qwen3.5-4B-Q4_K_M.gguf";
     let base_paths = [
@@ -55,35 +54,34 @@ async fn stream_stem_tutor_inference(
 ) -> Result<(), String> {
     let model_path = locate_model_file()?;
 
-    // Execute in separate blocking thread due to LlamaContext raw !Send/!Sync bounds
     tokio::task::spawn_blocking(move || {
         let backend = get_backend();
 
-        // 1. Configure for CPU-only evaluation (essential for integrated sandbox)
+        // Configure for CPU-only evaluation
         let model_params = LlamaModelParams::default()
             .with_n_gpu_layers(0);
         
         let model = LlamaModel::load_from_file(backend, &model_path, &model_params)
             .map_err(|e| format!("Failed to load model weights: {:?}", e))?;
 
-        // 2. Strict profiling configuration bounds (4 vCPUs / 8 GB RAM optimization)
+        // Strict profiling configuration bounds 
         let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(std::num::NonZeroU32::new(3072)) // strict context ceiling
-            .with_n_threads(4)                           // pin thread execution
+            .with_n_ctx(std::num::NonZeroU32::new(3072))
+            .with_n_threads(4)
             .with_n_threads_batch(4);
 
         let mut ctx = model.new_context(backend, ctx_params)
             .map_err(|e| format!("Context pool allocation failed: {:?}", e))?;
 
-        // 3. Format system template matching Qwen 3.5's ChatML structure
-        let system_prompt = "You are a Localized STEM Virtual Lab Tutor under the Africa Deep Tech Challenge 2026. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
+        // Format system template matching Qwen 3.5's ChatML structure
+        let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
         let formatted_prompt = format!(
             "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
             system_prompt,
             student_prompt
         );
 
-        // 4. Tokenize the input stream
+        // Tokenize the input stream
         let tokens = model.str_to_token(&formatted_prompt, AddBos::Always)
             .map_err(|e| format!("Tokenization engine fault: {:?}", e))?;
 
@@ -91,7 +89,7 @@ async fn stream_stem_tutor_inference(
             return Err("Input string payload exceeds strict 3072 context ceiling.".to_string());
         }
 
-        // 5. Initialize batch and prefill
+        // Initialize batch and prefill
         let mut batch = LlamaBatch::new(tokens.len(), 1);
         for (i, token) in tokens.iter().enumerate() {
             let logits = i == tokens.len() - 1;
@@ -127,27 +125,42 @@ async fn stream_stem_tutor_inference(
             
             utf8_buffer.extend_from_slice(&bytes);
 
-            // Attempt to decode accumulated bytes safely
-            match String::from_utf8(utf8_buffer.clone()) {
-                Ok(valid_string) => {
-                    app.emit("adtc-token-stream", TokenPayload { token: valid_string })
+            // Verify and decode accumulated bytes using std::str::from_utf8 (no clone on happy path)
+            match std::str::from_utf8(&utf8_buffer) {
+                Ok(valid_str) => {
+                    app.emit("adtc-token-stream", TokenPayload { token: valid_str.to_string() })
                         .map_err(|e| format!("IPC stream emit failed: {:?}", e))?;
                     utf8_buffer.clear(); // Flush buffer once successfully decoded
                 }
                 Err(utf8_err) => {
-                    // Check if the error is due to an incomplete sequence at the end of the buffer.
-                    // If so, keep the bytes in the buffer and wait for the next token to complete it.
-                    if let Some(valid_up_to) = utf8_err.error_len() {
-                        // If there are actually invalid bytes, decode what we can lossily or skip them
-                        let valid_part = &utf8_buffer[..utf8_err.valid_up_to()];
+                    let valid_up_to = utf8_err.valid_up_to();
+                    
+                    if let Some(error_len) = utf8_err.error_len() {
+                        // Case 1: There is an invalid byte sequence of known length in the stream.
+                        // Emit whatever was valid before the error.
+                        let valid_part = &utf8_buffer[..valid_up_to];
                         let valid_str = String::from_utf8_lossy(valid_part).into_owned();
                         app.emit("adtc-token-stream", TokenPayload { token: valid_str })
                             .map_err(|e| format!("IPC stream emit failed: {:?}", e))?;
                         
-                        // Keep only the remainder of the bytes for the next turn
-                        utf8_buffer = utf8_buffer[utf8_err.valid_up_to() + valid_up_to..].to_vec();
+                        // Keep only the bytes coming after the invalid sequence
+                        utf8_buffer = utf8_buffer[valid_up_to + error_len..].to_vec();
+                    } else {
+                        // Case 2: Incomplete multibyte UTF-8 sequence at the end of the buffer (normal streaming behavior).
+                        // Emit whatever portion is valid so far, keeping UI lag down.
+                        if valid_up_to > 0 {
+                            let valid_part = &utf8_buffer[..valid_up_to];
+                            // We know this slice is valid UTF-8, so unwrap is safe.
+                            let valid_str = std::str::from_utf8(valid_part).unwrap().to_string();
+                            app.emit("adtc-token-stream", TokenPayload { token: valid_str })
+                                .map_err(|e| format!("IPC stream emit failed: {:?}", e))?;
+                            
+                            // Truncate the buffer to keep only the trailing incomplete byte sequence
+                            utf8_buffer = utf8_buffer[valid_up_to..].to_vec();
+                        }
+                        // If valid_up_to is 0, the entire buffer is an incomplete sequence.
+                        // Do not emit yet; wait for the next token to complete it.
                     }
-                    // If error_len() is None, we are missing bytes at the end. Leave the buffer as-is to let the next token complete it.
                 }
             }
 
