@@ -2,8 +2,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import katex from "katex";
+  import "katex/dist/katex.min.css";
 
-  // System & Chat State (using Svelte 5 Runes)
+
   let studentInput = $state("");
   let terminalBuffer = $state("Select a lab module from the shortcuts or input a custom science experiment to begin...");
   let isGenerating = $state(false);
@@ -21,7 +23,7 @@
   let numThreads = $state(4);
   let contextCap = $state(3072);
   let temperature = $state(0.1);
-  let selectedModel = $state("Phi-3.5 Mini GGUF");
+  let selectedModel = $state("Qwen3.5 Mini GGUF");
 
   // Simulation State: 1. Solenoid (Electromagnetism)
   let solenoidCurrent = $state(2.5); // Amperes (-5A to 5A)
@@ -120,39 +122,125 @@
     (gasParticlesCount * 8.314 * gasTemperature) / (gasVolume * 10)
   );
 
-  // Svelte 5 helper: Safe HTML Markdown formatting
+  // Svelte 5 helper: Safe HTML Markdown formatting with LaTeX Math (KaTeX) and collapsible <think> blocks
   function formatMarkdown(text: string) {
     if (!text) return "";
-    let html = text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-      
-    // Headings
-    html = html.replace(/^### (.*?)$/gm, '<h3 class="term-h3">$1</h3>');
-    html = html.replace(/^## (.*?)$/gm, '<h2 class="term-h2">$2</h2>');
-    html = html.replace(/^# (.*?)$/gm, '<h1 class="term-h1">$1</h1>');
-    
-    // Bold & Italics
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="term-bold">$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em class="term-italic">$1</em>');
-    
-    // Code blocks
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      return `<pre class="term-code-block"><div class="code-lang">${lang || 'code'}</div><code>${code}</code></pre>`;
+
+    const mathBlocks: string[] = [];
+
+    // 1. Extract Block Math ($$...$$)
+    let processedText = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+      const placeholder = `__MATH_BLOCK_${mathBlocks.length}__`;
+      mathBlocks.push(math.trim());
+      return placeholder;
     });
 
-    // Inline code
-    html = html.replace(/`(.*?)`/g, '<code class="term-code">$1</code>');
-    
-    // Special lines
-    html = html.replace(/^\[SYSTEM\]:(.*?)$/gm, '<span class="system-msg">[SYSTEM]: $1</span>');
-    html = html.replace(/^\[CRITICAL ERROR\]:(.*?)$/gm, '<span class="error-msg">[CRITICAL ERROR]: $1</span>');
-    
-    // Newlines
-    html = html.replace(/\n/g, '<br/>');
-    
-    return html;
+    // 2. Extract Inline Math ($...$)
+    processedText = processedText.replace(/\$([^\$\s](?:[^\$]*?[^\$\s])?)\$/g, (_, math) => {
+      const placeholder = `__MATH_INLINE_${mathBlocks.length}__`;
+      mathBlocks.push(math.trim());
+      return placeholder;
+    });
+
+    // 3. Extract <think> block if present
+    let thinkHtml = "";
+    const thinkStart = processedText.indexOf("<think>");
+    if (thinkStart !== -1) {
+      const thinkEnd = processedText.indexOf("</think>", thinkStart);
+      let thinkingContent = "";
+      if (thinkEnd !== -1) {
+        thinkingContent = processedText.substring(thinkStart + 7, thinkEnd);
+        processedText = processedText.substring(0, thinkStart) + processedText.substring(thinkEnd + 8);
+      } else {
+        thinkingContent = processedText.substring(thinkStart + 7);
+        processedText = processedText.substring(0, thinkStart);
+      }
+
+      // Format thinking content using markdown rules (without thinking block wrapping itself)
+      thinkingContent = formatMarkdownCore(thinkingContent);
+
+      // Collapsible details element for thinking process: open during generation, closed when done
+      const isOpen = !text.includes("</think>");
+      thinkHtml = `
+        <details class="term-think-details" ${isOpen ? "open" : ""}>
+          <summary class="term-think-summary">🧠 Tutor's Thought Process</summary>
+          <div class="term-think-body">${thinkingContent}</div>
+        </details>
+      `;
+    }
+
+    // 4. Format core markdown on the main body
+    processedText = formatMarkdownCore(processedText);
+
+    // Helper to format headings, bold/italics, lists, and code blocks
+    function formatMarkdownCore(rawText: string) {
+      if (!rawText) return "";
+      let html = rawText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+        
+      // Headings
+      html = html.replace(/^### (.*?)$/gm, '<h3 class="term-h3">$1</h3>');
+      html = html.replace(/^## (.*?)$/gm, '<h2 class="term-h2">$1</h2>');
+      html = html.replace(/^# (.*?)$/gm, '<h1 class="term-h1">$1</h1>');
+      
+      // Bold & Italics
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="term-bold">$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em class="term-italic">$1</em>');
+      
+      // Code blocks
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        return `<pre class="term-code-block"><div class="code-lang">${lang || 'code'}</div><code>${code}</code></pre>`;
+      });
+
+      // Inline code
+      html = html.replace(/`(.*?)`/g, '<code class="term-code">$1</code>');
+      
+      // Bullet list items
+      html = html.replace(/^\s*[\*\-]\s+(.*?)$/gm, '<li class="term-li">$1</li>');
+
+      // Special lines
+      html = html.replace(/^\[SYSTEM\]:(.*?)$/gm, '<span class="system-msg">[SYSTEM]: $1</span>');
+      html = html.replace(/^\[CRITICAL ERROR\]:(.*?)$/gm, '<span class="error-msg">[CRITICAL ERROR]: $1</span>');
+      
+      // Newlines
+      html = html.replace(/\n/g, '<br/>');
+      
+      return html;
+    }
+
+    // 5. Restore and render KaTeX formulas
+    for (let i = 0; i < mathBlocks.length; i++) {
+      const blockPlaceholder = `__MATH_BLOCK_${i}__`;
+      if (processedText.includes(blockPlaceholder) || thinkHtml.includes(blockPlaceholder)) {
+        try {
+          const rendered = katex.renderToString(mathBlocks[i], { displayMode: true, throwOnError: false });
+          processedText = processedText.replace(blockPlaceholder, rendered);
+          thinkHtml = thinkHtml.replace(blockPlaceholder, rendered);
+        } catch (e) {
+          const errorHtml = `<span class="math-error">${mathBlocks[i]}</span>`;
+          processedText = processedText.replace(blockPlaceholder, errorHtml);
+          thinkHtml = thinkHtml.replace(blockPlaceholder, errorHtml);
+        }
+      }
+      
+      const inlinePlaceholder = `__MATH_INLINE_${i}__`;
+      if (processedText.includes(inlinePlaceholder) || thinkHtml.includes(inlinePlaceholder)) {
+        try {
+          const rendered = katex.renderToString(mathBlocks[i], { displayMode: false, throwOnError: false });
+          processedText = processedText.replace(inlinePlaceholder, rendered);
+          thinkHtml = thinkHtml.replace(inlinePlaceholder, rendered);
+        } catch (e) {
+          const errorHtml = `<span class="math-error">${mathBlocks[i]}</span>`;
+          processedText = processedText.replace(inlinePlaceholder, errorHtml);
+          thinkHtml = thinkHtml.replace(inlinePlaceholder, errorHtml);
+        }
+      }
+    }
+
+    // Return combined HTML
+    return thinkHtml + processedText;
   }
 
   let formattedConsole = $derived(formatMarkdown(terminalBuffer));
@@ -1430,6 +1518,56 @@
     color: #ef4444;
     font-weight: bold;
   }
+
+  /* Collapsible Thought Process */
+  :global(.term-think-details) {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px dashed #334155;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.85rem;
+  }
+
+  :global(.term-think-summary) {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+    outline: none;
+  }
+
+  :global(.term-think-summary:hover) {
+    color: #cbd5e1;
+  }
+
+  :global(.term-think-body) {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+    margin-top: 0.4rem;
+    border-left: 2px solid #334155;
+    padding-left: 0.65rem;
+    line-height: 1.45;
+  }
+
+  /* List items */
+  :global(.term-li) {
+    display: list-item;
+    list-style-type: disc;
+    margin-left: 1.35rem;
+    margin-bottom: 0.3rem;
+    color: #cbd5e1;
+  }
+
+  :global(.math-error) {
+    color: #f43f5e;
+    background: rgba(244, 63, 94, 0.1);
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+
 
   /* Prompt Input Area */
   .input-tray {

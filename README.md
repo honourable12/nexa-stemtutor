@@ -79,7 +79,7 @@ stemtutor/
 ├── metadata.json          ← Submission information and test prompts
 ├── REPORT.md              ← Technical report (problem, benchmarks)
 ├── model/
-│   └── phi-3.5-mini-instruct-q4_k_m.gguf  ← Downloaded GGUF weights (Ignored)
+│   └── Qwen3.5-mini-instruct-q4_k_m.gguf  ← Downloaded GGUF weights (Ignored)
 └── adtc-stem-tutor/       ← Tauri app workspace
     ├── package.json
     ├── svelte.config.js

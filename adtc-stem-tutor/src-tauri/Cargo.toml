@@ -26,3 +26,11 @@ tokio = { version = "1.0", features = ["full"] }
 # Low-level llama.cpp bindings (Safe wrapper around C++ llama.cpp)
 # Requires cmake and clang/build-essential installed locally to compile GGML FFI bindings.
 llama-cpp-2 = "0.1.143"
+
+# Override optimizations specifically for development dependencies
+[profile.dev.package."*"]
+opt-level = 3
+
+# Force the underlying llama-cpp bindings to compile with full speed in dev mode
+[profile.dev.package.llama-cpp-2]
+opt-level = 3

@@ -54,7 +54,7 @@
     terminalBuffer = `[SYSTEM]: Connecting to offline GGML backend...\n` +
                      `[SYSTEM]: Pinned Core: 4 Threads (-t 4)\n` +
                      `[SYSTEM]: Context Cache: FP16 active (Strict 3,072 max tokens)\n` +
-                     `[SYSTEM]: Loading local Phi-3.5 3.8B model parameters...\n` +
+                     `[SYSTEM]: Loading local Qwen3.5 ~4B model parameters...\n` +
                      `[SYSTEM]: Pre-loading context arrays for: "${queryText}"...\n\n` +
                      `[SYSTEM]: Running inference... (Calculations started)\n\n`;
     
@@ -114,7 +114,7 @@
       <div class="stat-icon">🔋</div>
       <div class="stat-content">
         <span class="stat-label">Model Target</span>
-        <span class="stat-value">Phi-3.5 Mini GGUF</span>
+        <span class="stat-value">Qwen3.5 GGUF</span>
       </div>
     </div>
   </section>
