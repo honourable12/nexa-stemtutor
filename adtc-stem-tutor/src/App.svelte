@@ -9,6 +9,49 @@
   let isFirstToken = false;
   let activeModule = '';
 
+  interface ChatMessage {
+    role: "user" | "assistant";
+    content: string;
+  }
+  let chatHistory: ChatMessage[] = [];
+
+  function compileChatMLPrompt(newQuery: string): string {
+    const systemPrompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
+    const lastTurnsMessages = chatHistory.slice(-6);
+    let prompt = `<|im_start|>system\n${systemPrompt}<|im_end|>\n`;
+    for (const msg of lastTurnsMessages) {
+      prompt += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
+    }
+    prompt += `<|im_start|>user\n${newQuery}<|im_end|>\n<|im_start|>assistant\n`;
+    return prompt;
+  }
+
+  function clearHistory() {
+    chatHistory = [];
+    terminalBuffer = 'Select a lab module from the shortcuts or input a custom science experiment to begin...';
+  }
+
+  $: formattedConsole = formatConsoleForAppSvelte(chatHistory, terminalBuffer);
+  
+  function formatConsoleForAppSvelte(history: ChatMessage[], buffer: string): string {
+    let html = "";
+    for (const msg of history) {
+      if (msg.role === "user") {
+        const escapedContent = msg.content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        html += `<div class="terminal-user-query"><span class="cmd-prompt">&gt; Student:</span> <span class="query-text">${escapedContent}</span></div>`;
+      } else if (msg.role === "assistant") {
+        html += `<div class="terminal-assistant-response">${msg.content}</div>`;
+      }
+    }
+    if (buffer) {
+      html += `<div class="terminal-current-stream">${buffer}</div>`;
+    }
+    return html;
+  }
+
   // Curated interactive lab shortcuts for offline users
   const labShortcuts = [
     { 
@@ -48,6 +91,10 @@
   async function launchSimulation(queryText: string, label: string = "Custom Query") {
     if (!queryText.trim() || isGenerating) return;
     
+    const compiledPrompt = compileChatMLPrompt(queryText);
+    studentInput = '';
+    chatHistory.push({ role: "user", content: queryText });
+
     isGenerating = true;
     isFirstToken = true;
     activeModule = label;
@@ -59,7 +106,8 @@
                      `[SYSTEM]: Running inference... (Calculations started)\n\n`;
     
     try {
-      await invoke('stream_stem_tutor_inference', { studentPrompt: queryText });
+      await invoke('stream_stem_tutor_inference', { studentPrompt: compiledPrompt });
+      chatHistory.push({ role: 'assistant', content: terminalBuffer });
       terminalBuffer += `\n\n[SYSTEM]: Inference complete. CPU resources released back to host OS.`;
     } catch (err) {
       terminalBuffer += `\n\n[CRITICAL ERROR]: ${err}`;
@@ -67,7 +115,6 @@
       isGenerating = false;
       isFirstToken = false;
     }
-    studentInput = '';
   }
 </script>
 
@@ -144,14 +191,26 @@
         <span class="console-icon">💻</span>
         <span>Simulator Terminal Output</span>
       </div>
-      {#if isGenerating}
-        <span class="loader-pulse">⚡ Stream Active (Computing...)</span>
-      {:else}
-        <span class="status-ready">✓ System Idle</span>
-      {/if}
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        {#if chatHistory.length > 0}
+          <button 
+            on:click={clearHistory} 
+            disabled={isGenerating} 
+            class="btn-clear-console"
+            title="Clear conversation history to free RAM/context"
+          >
+            🧹 Clear Context
+          </button>
+        {/if}
+        {#if isGenerating}
+          <span class="loader-pulse">⚡ Stream Active (Computing...)</span>
+        {:else}
+          <span class="status-ready">✓ System Idle</span>
+        {/if}
+      </div>
     </div>
     <div id="terminal-view" class="terminal-view">
-      {terminalBuffer}
+      {@html formattedConsole}
     </div>
   </section>
 
@@ -407,6 +466,48 @@
     color: #38bdf8;
     white-space: pre-wrap;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+  }
+
+  :global(.terminal-user-query) {
+    background: rgba(168, 85, 247, 0.08);
+    border-left: 2px solid #a855f7;
+    padding: 0.35rem 0.6rem;
+    margin: 0.5rem 0 0.8rem 0;
+    border-radius: 2px;
+  }
+
+  :global(.query-text) {
+    color: #f1f5f9;
+    font-weight: 500;
+  }
+
+  :global(.terminal-assistant-response) {
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed rgba(30, 41, 59, 0.6);
+    padding-bottom: 0.8rem;
+  }
+
+  :global(.terminal-assistant-response:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .btn-clear-console {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .btn-clear-console:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #f87171;
   }
 
   /* Interaction Tray */

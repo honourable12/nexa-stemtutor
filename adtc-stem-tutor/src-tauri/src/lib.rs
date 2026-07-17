@@ -74,12 +74,17 @@ async fn stream_stem_tutor_inference(
             .map_err(|e| format!("Context pool allocation failed: {:?}", e))?;
 
         // Format system template matching Qwen 3.5's ChatML structure
-        let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
-        let formatted_prompt = format!(
-            "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
-            system_prompt,
+        // If the prompt is already compiled to ChatML from the frontend, use it directly
+        let formatted_prompt = if student_prompt.starts_with("<|im_start|>") {
             student_prompt
-        );
+        } else {
+            let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
+            format!(
+                "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
+                system_prompt,
+                student_prompt
+            )
+        };
 
         // Tokenize the input stream
         let tokens = model.str_to_token(&formatted_prompt, AddBos::Always)

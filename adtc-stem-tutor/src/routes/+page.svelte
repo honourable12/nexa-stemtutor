@@ -8,6 +8,12 @@
 
   let studentInput = $state("");
   let terminalBuffer = $state("Select a lab module from the shortcuts or input a custom science experiment to begin...");
+
+  interface ChatMessage {
+    role: "user" | "assistant";
+    content: string;
+  }
+  let chatHistory: ChatMessage[] = $state([]);
   let isGenerating = $state(false);
   let isFirstToken = $state(false);
   let activeModule = $state("🧲 Electromagnetism");
@@ -243,7 +249,61 @@
     return thinkHtml + processedText;
   }
 
-  let formattedConsole = $derived(formatMarkdown(terminalBuffer));
+  // Compile the sliding window prompt
+  function compileChatMLPrompt(newQuery: string): string {
+    const systemPrompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
+    
+    // Keep only the last 3 turns of dialogue prior to the current newQuery.
+    // 3 turns = 6 messages.
+    const lastTurnsMessages = chatHistory.slice(-6);
+    
+    let prompt = `<|im_start|>system\n${systemPrompt}<|im_end|>\n`;
+    for (const msg of lastTurnsMessages) {
+      prompt += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
+    }
+    
+    prompt += `<|im_start|>user\n${newQuery}<|im_end|>\n<|im_start|>assistant\n`;
+    return prompt;
+  }
+
+  // Clear conversation history
+  function clearHistory() {
+    chatHistory = [];
+    terminalBuffer = "Select a lab module from the shortcuts or input a custom science experiment to begin...";
+  }
+
+  let formattedConsole = $derived.by(() => {
+    let html = "";
+    for (const msg of chatHistory) {
+      if (msg.role === "user") {
+        const escapedContent = msg.content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        html += `<div class="terminal-user-query"><span class="cmd-prompt">&gt; Student:</span> <span class="query-text">${escapedContent}</span></div>`;
+      } else if (msg.role === "assistant") {
+        html += `<div class="terminal-assistant-response">${formatMarkdown(msg.content)}</div>`;
+      }
+    }
+    
+    if (terminalBuffer) {
+      html += `<div class="terminal-current-stream">${formatMarkdown(terminalBuffer)}</div>`;
+    }
+    
+    return html;
+  });
+
+  // Auto scroll console on changes
+  $effect(() => {
+    if (formattedConsole || isGenerating) {
+      const terminalEl = document.getElementById("terminal-view");
+      if (terminalEl) {
+        setTimeout(() => {
+          terminalEl.scrollTop = terminalEl.scrollHeight;
+        }, 10);
+      }
+    }
+  });
 
   // Safely check if running inside Tauri shell
   const isTauri = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
@@ -364,6 +424,10 @@
       await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 25));
     }
     
+    // Set terminalBuffer to exact mockText and add to Svelte chat state
+    terminalBuffer = mockText;
+    chatHistory.push({ role: "assistant", content: mockText });
+    
     terminalBuffer += `\n\n[SYSTEM]: Inference complete. CPU resources released back to operating system.`;
     isGenerating = false;
     isFirstToken = false;
@@ -373,6 +437,15 @@
   async function launchSimulation(queryText: string, label: string = "Custom Query", simulationTab?: string) {
     if (!queryText.trim() || isGenerating) return;
     
+    // Compile sliding window ChatML prompt containing system prompt + last 3 turns of history + current query
+    const compiledPrompt = compileChatMLPrompt(queryText);
+
+    // Clear student input box
+    studentInput = "";
+    
+    // Append the student's query to frontend state history
+    chatHistory.push({ role: "user", content: queryText });
+
     isGenerating = true;
     isFirstToken = true;
     activeModule = label;
@@ -394,7 +467,11 @@
 
     if (isTauri) {
       try {
-        await invoke("stream_stem_tutor_inference", { studentPrompt: queryText });
+        await invoke("stream_stem_tutor_inference", { studentPrompt: compiledPrompt });
+        
+        // Push the compiled tutor response to frontend state history
+        chatHistory.push({ role: "assistant", content: terminalBuffer });
+        
         terminalBuffer += `\n\n[SYSTEM]: Inference complete. CPU resources released back to operating system.`;
       } catch (err) {
         terminalBuffer += `\n\n[CRITICAL ERROR]: ${err}`;
@@ -708,7 +785,17 @@
             <span class="cmd-prompt">>_</span>
             <span>Simulator Terminal Output</span>
           </div>
-          <div class="console-metrics">
+          <div class="console-metrics" style="display: flex; align-items: center;">
+            {#if chatHistory.length > 0}
+              <button 
+                onclick={clearHistory} 
+                disabled={isGenerating} 
+                class="btn-clear-console"
+                title="Clear conversation history to free RAM/context"
+              >
+                🧹 Clear Context
+              </button>
+            {/if}
             {#if isGenerating}
               <span class="indicator-computing">⚡ CPU Generating: {tokenSpeed} tok/s</span>
             {:else}
@@ -1441,6 +1528,49 @@
 
   .terminal-feed {
     word-break: break-word;
+  }
+
+  :global(.terminal-user-query) {
+    background: rgba(168, 85, 247, 0.08);
+    border-left: 2px solid #a855f7;
+    padding: 0.35rem 0.6rem;
+    margin: 0.5rem 0 0.8rem 0;
+    border-radius: 2px;
+  }
+
+  :global(.query-text) {
+    color: #f1f5f9;
+    font-weight: 500;
+  }
+
+  :global(.terminal-assistant-response) {
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed rgba(30, 41, 59, 0.6);
+    padding-bottom: 0.8rem;
+  }
+
+  :global(.terminal-assistant-response:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .btn-clear-console {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    margin-right: 0.5rem;
+  }
+
+  .btn-clear-console:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #f87171;
   }
 
   /* Blinking cursor effect */
