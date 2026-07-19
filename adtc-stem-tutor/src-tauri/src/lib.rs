@@ -16,6 +16,7 @@ static MODEL: OnceLock<LlamaModel> = OnceLock::new();
 
 const N_THREADS: i32 = 4;
 const N_CTX: u32 = 3072;
+const N_BATCH: u32 = 512;
 
 fn get_backend() -> &'static LlamaBackend {
     BACKEND.get_or_init(|| {
@@ -74,8 +75,8 @@ fn locate_model_file() -> Result<PathBuf, String> {
 fn build_context_params() -> LlamaContextParams {
     LlamaContextParams::default()
         .with_n_ctx(std::num::NonZeroU32::new(N_CTX))
-        .with_n_batch(N_CTX)
-        .with_n_ubatch(N_CTX)
+        .with_n_batch(N_BATCH)
+        .with_n_ubatch(N_BATCH)
         .with_n_threads(N_THREADS)
         .with_n_threads_batch(N_THREADS)
         .with_type_k(KvCacheType::Q8_0)
@@ -119,15 +120,21 @@ async fn stream_stem_tutor_inference(
             ));
         }
 
-        let mut batch = LlamaBatch::new(tokens.len(), 1);
-        for (i, token) in tokens.iter().enumerate() {
-            let logits = i == tokens.len() - 1;
-            batch.add(*token, i as i32, &[0], logits)
-                .map_err(|e| format!("Batch allocation error: {:?}", e))?;
+        let mut batch = LlamaBatch::new(N_BATCH as usize, 1);
+        let mut i = 0;
+        while i < tokens.len() {
+            let chunk_size = std::cmp::min(tokens.len() - i, N_BATCH as usize);
+            batch.clear();
+            for j in 0..chunk_size {
+                let token_idx = i + j;
+                let logits = token_idx == tokens.len() - 1;
+                batch.add(tokens[token_idx], token_idx as i32, &[0], logits)
+                    .map_err(|e| format!("Batch allocation error: {:?}", e))?;
+            }
+            ctx.decode(&mut batch)
+                .map_err(|e| format!("Prefill decoding pipeline crashed: {:?}", e))?;
+            i += chunk_size;
         }
-
-        ctx.decode(&mut batch)
-            .map_err(|e| format!("Prefill decoding pipeline crashed: {:?}", e))?;
 
         let mut sampler = LlamaSampler::chain_simple([
             LlamaSampler::greedy(),
@@ -261,13 +268,19 @@ mod tests {
 
         let tokens = model.str_to_token(&formatted_prompt, AddBos::Always).unwrap();
 
-        let mut batch = LlamaBatch::new(tokens.len(), 1);
-        for (i, token) in tokens.iter().enumerate() {
-            let logits = i == tokens.len() - 1;
-            batch.add(*token, i as i32, &[0], logits).unwrap();
+        let mut batch = LlamaBatch::new(N_BATCH as usize, 1);
+        let mut i = 0;
+        while i < tokens.len() {
+            let chunk_size = std::cmp::min(tokens.len() - i, N_BATCH as usize);
+            batch.clear();
+            for j in 0..chunk_size {
+                let token_idx = i + j;
+                let logits = token_idx == tokens.len() - 1;
+                batch.add(tokens[token_idx], token_idx as i32, &[0], logits).unwrap();
+            }
+            ctx.decode(&mut batch).unwrap();
+            i += chunk_size;
         }
-
-        ctx.decode(&mut batch).unwrap();
 
         let mut sampler = LlamaSampler::chain_simple([
             LlamaSampler::greedy(),
