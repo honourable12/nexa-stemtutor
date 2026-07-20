@@ -461,7 +461,7 @@
                      `[SYSTEM]: Thread Allocation: ${numThreads} Cores (Strict Pinning)\n` +
                      `[SYSTEM]: Context Cache Bound: ${contextCap} Max Tokens\n` +
                      `[SYSTEM]: Core Memory Allocation: FP16 Key-Value Cache Format\n` +
-                     `[SYSTEM]: Active Model Modelfile: /models/phi-3.5-mini-instruct-q4_k_m.gguf\n` +
+                     `[SYSTEM]: Active Model Modelfile: /models/Qwen3.5-4B-Q4_K_M.gguf\n` +
                      `[SYSTEM]: Feeding query input prompt context...\n\n` +
                      `[SYSTEM]: Initiating matrix calculations on CPU threads. Generating explanation:\n\n`;
 

@@ -22,3 +22,5 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+results-folder/
+do.txt

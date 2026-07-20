@@ -79,8 +79,9 @@ fn build_context_params() -> LlamaContextParams {
         .with_n_ubatch(N_BATCH)
         .with_n_threads(N_THREADS)
         .with_n_threads_batch(N_THREADS)
-        .with_type_k(KvCacheType::Q8_0)
-        .with_type_v(KvCacheType::Q8_0)
+        // Set KV cache back to standard F16 for fast CPU prefill
+        .with_type_k(KvCacheType::F16)
+        .with_type_v(KvCacheType::F16)
         .with_offload_kqv(false)
 }
 
@@ -154,7 +155,7 @@ async fn stream_stem_tutor_inference(
                 break;
             }
 
-            let bytes = model.token_to_piece_bytes(token, 128, true, None)
+            let bytes = model.token_to_piece_bytes(token, 128, false, None)
                 .map_err(|e| format!("Detokenizer cycle error: {:?}", e))?;
 
             utf8_buffer.extend_from_slice(&bytes);
