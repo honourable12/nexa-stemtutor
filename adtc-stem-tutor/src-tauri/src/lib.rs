@@ -164,9 +164,10 @@ async fn stream_stem_tutor_inference(
         let formatted_prompt = if student_prompt.starts_with("<|im_start|>") {
             student_prompt
         } else {
-            let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. If asked to translate, support multilingual outputs (e.g., Swahili, French) flawlessly.";
+            let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Respond directly without thinking tokens or internal reasoning blocks. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. Support multilingual outputs (e.g., Swahili, French) flawlessly.";
+            
             format!(
-                "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
+                "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n",
                 system_prompt,
                 student_prompt
             )
