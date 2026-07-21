@@ -14,9 +14,9 @@ use tauri::{AppHandle, Emitter};
 static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
 static MODEL: OnceLock<LlamaModel> = OnceLock::new();
 
-const N_THREADS: i32 = 4;
+const N_THREADS: i32 = 2;
 const N_CTX: u32 = 3072;
-const N_BATCH: u32 = 512;
+const N_BATCH: u32 = 1024;
 
 fn get_backend() -> &'static LlamaBackend {
     BACKEND.get_or_init(|| {
@@ -31,11 +31,21 @@ fn get_model() -> Result<&'static LlamaModel, String> {
     let model_path = locate_model_file()?;
     let backend = get_backend();
 
+    eprintln!("Info: Loading model from path: {}", model_path.display());
+    let start = std::time::Instant::now();
+
     let model_params = LlamaModelParams::default()
-        .with_n_gpu_layers(0);
+        .with_n_gpu_layers(0)
+        .with_use_mmap(true);
 
     let model = LlamaModel::load_from_file(backend, &model_path, &model_params)
-        .map_err(|e| format!("Failed to load model weights: {:?}", e))?;
+        .map_err(|e| {
+            let err_msg = format!("Failed to load model weights from {}: {:?}", model_path.display(), e);
+            eprintln!("Error: {}", err_msg);
+            err_msg
+        })?;
+
+    eprintln!("Info: Model loaded successfully in {:?}", start.elapsed());
 
     let _ = MODEL.set(model);
     Ok(MODEL.get().unwrap())
@@ -50,6 +60,44 @@ struct TokenPayload {
 
 fn locate_model_file() -> Result<PathBuf, String> {
     let target_filename = "Qwen3.5-4B-Q4_K_M.gguf";
+
+    // 1. Try relative paths from current working directory walking upwards
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = Some(cwd.as_path());
+        while let Some(path) = curr {
+            let p_model = path.join("model").join(target_filename);
+            if p_model.exists() {
+                eprintln!("Info: Found model via CWD search at: {}", p_model.display());
+                return Ok(p_model);
+            }
+            let p_direct = path.join(target_filename);
+            if p_direct.exists() {
+                eprintln!("Info: Found model via CWD search at: {}", p_direct.display());
+                return Ok(p_direct);
+            }
+            curr = path.parent();
+        }
+    }
+
+    // 2. Try relative paths from current executable walking upwards
+    if let Ok(exe_path) = std::env::current_exe() {
+        let mut curr = exe_path.parent();
+        while let Some(path) = curr {
+            let p_model = path.join("model").join(target_filename);
+            if p_model.exists() {
+                eprintln!("Info: Found model via EXE search at: {}", p_model.display());
+                return Ok(p_model);
+            }
+            let p_direct = path.join(target_filename);
+            if p_direct.exists() {
+                eprintln!("Info: Found model via EXE search at: {}", p_direct.display());
+                return Ok(p_direct);
+            }
+            curr = path.parent();
+        }
+    }
+
+    // 3. Fallback to hardcoded relative search paths
     let base_paths = [
         format!("model/{}", target_filename),
         format!("../model/{}", target_filename),
@@ -61,16 +109,18 @@ fn locate_model_file() -> Result<PathBuf, String> {
     for path_str in &base_paths {
         let p = Path::new(path_str);
         if p.exists() {
+            eprintln!("Info: Found model via fallback relative path: {}", p.display());
             return Ok(p.to_path_buf());
         }
     }
 
-    Err(format!(
-        "Model file '{}' not found. Please verify your download_model.sh script successfully fetched the assets.",
+    let err_msg = format!(
+        "Model file '{}' not found. Looked in CWD parents, EXE parents, and fallback paths. Please verify your download_model.sh script successfully fetched the assets.",
         target_filename
-    ))
+    );
+    eprintln!("Error: {}", err_msg);
+    Err(err_msg)
 }
-
 
 fn build_context_params() -> LlamaContextParams {
     LlamaContextParams::default()
@@ -80,8 +130,8 @@ fn build_context_params() -> LlamaContextParams {
         .with_n_threads(N_THREADS)
         .with_n_threads_batch(N_THREADS)
         // Set KV cache back to standard F16 for fast CPU prefill
-        .with_type_k(KvCacheType::F16)
-        .with_type_v(KvCacheType::F16)
+        .with_type_k(KvCacheType::Q8_0)
+        .with_type_v(KvCacheType::Q8_0)
         .with_offload_kqv(false)
 }
 
@@ -91,14 +141,25 @@ async fn stream_stem_tutor_inference(
     student_prompt: String,
 ) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
+        let start_time = std::time::Instant::now();
+        eprintln!("Info: stream_stem_tutor_inference invoked");
+
         let _guard = GEN_LOCK.lock().unwrap();
 
-        let model = get_model()?;
+        let model = get_model().map_err(|e| {
+            eprintln!("Error loading model: {}", e);
+            e
+        })?;
         let backend = get_backend();
 
         let ctx_params = build_context_params();
         let mut ctx: LlamaContext = model.new_context(backend, ctx_params)
-            .map_err(|e| format!("Context pool allocation failed: {:?}", e))?;
+            .map_err(|e| {
+                let err = format!("Context pool allocation failed: {:?}", e);
+                eprintln!("Error: {}", err);
+                err
+            })?;
+        eprintln!("Info: Context allocated in {:?}", start_time.elapsed());
 
         let formatted_prompt = if student_prompt.starts_with("<|im_start|>") {
             student_prompt
@@ -112,15 +173,22 @@ async fn stream_stem_tutor_inference(
         };
 
         let tokens = model.str_to_token(&formatted_prompt, AddBos::Always)
-            .map_err(|e| format!("Tokenization engine fault: {:?}", e))?;
+            .map_err(|e| {
+                let err = format!("Tokenization engine fault: {:?}", e);
+                eprintln!("Error: {}", err);
+                err
+            })?;
 
         if tokens.len() as u32 > N_CTX {
-            return Err(format!(
+            let err = format!(
                 "Input string payload exceeds strict {} context ceiling.",
                 N_CTX
-            ));
+            );
+            eprintln!("Error: {}", err);
+            return Err(err);
         }
 
+        let prefill_start = std::time::Instant::now();
         let mut batch = LlamaBatch::new(N_BATCH as usize, 1);
         let mut i = 0;
         while i < tokens.len() {
@@ -130,12 +198,22 @@ async fn stream_stem_tutor_inference(
                 let token_idx = i + j;
                 let logits = token_idx == tokens.len() - 1;
                 batch.add(tokens[token_idx], token_idx as i32, &[0], logits)
-                    .map_err(|e| format!("Batch allocation error: {:?}", e))?;
+                    .map_err(|e| {
+                        let err = format!("Batch allocation error: {:?}", e);
+                        eprintln!("Error: {}", err);
+                        err
+                    })?;
             }
             ctx.decode(&mut batch)
-                .map_err(|e| format!("Prefill decoding pipeline crashed: {:?}", e))?;
+                .map_err(|e| {
+                    let err = format!("Prefill decoding pipeline crashed: {:?}", e);
+                    eprintln!("Error: {}", err);
+                    err
+                })?;
             i += chunk_size;
         }
+        let prefill_duration = prefill_start.elapsed();
+        eprintln!("Info: Prefilled {} tokens in {:?}", tokens.len(), prefill_duration);
 
         let mut sampler = LlamaSampler::chain_simple([
             LlamaSampler::greedy(),
@@ -145,7 +223,9 @@ async fn stream_stem_tutor_inference(
         let mut utf8_buffer: Vec<u8> = Vec::new();
 
         let mut emit_buffer = String::new();
-        const EMIT_FLUSH_CHARS: usize = 4;
+
+        let gen_start = std::time::Instant::now();
+        let mut gen_count = 0;
 
         while n_cur < N_CTX as i32 {
             let batch_idx = (batch.n_tokens() - 1) as i32;
@@ -156,7 +236,11 @@ async fn stream_stem_tutor_inference(
             }
 
             let bytes = model.token_to_piece_bytes(token, 128, false, None)
-                .map_err(|e| format!("Detokenizer cycle error: {:?}", e))?;
+                .map_err(|e| {
+                    let err = format!("Detokenizer cycle error: {:?}", e);
+                    eprintln!("Error: {}", err);
+                    err
+                })?;
 
             utf8_buffer.extend_from_slice(&bytes);
 
@@ -179,21 +263,34 @@ async fn stream_stem_tutor_inference(
                 }
             }
 
-            if emit_buffer.chars().count() >= EMIT_FLUSH_CHARS {
+            if !emit_buffer.is_empty() {
                 app.emit("adtc-token-stream", TokenPayload { token: std::mem::take(&mut emit_buffer) })
-                    .map_err(|e| format!("IPC stream emit failed: {:?}", e))?;
+                    .map_err(|e| {
+                        let err = format!("IPC stream emit failed: {:?}", e);
+                        eprintln!("Error: {}", err);
+                        err
+                    })?;
             }
 
             sampler.accept(token);
 
             batch.clear();
             batch.add(token, n_cur, &[0], true)
-                .map_err(|e| format!("Batch rebuild fault: {:?}", e))?;
+                .map_err(|e| {
+                    let err = format!("Batch rebuild fault: {:?}", e);
+                    eprintln!("Error: {}", err);
+                    err
+                })?;
 
             ctx.decode(&mut batch)
-                .map_err(|e| format!("Token decoding failure: {:?}", e))?;
+                .map_err(|e| {
+                    let err = format!("Token decoding failure: {:?}", e);
+                    eprintln!("Error: {}", err);
+                    err
+                })?;
 
             n_cur += 1;
+            gen_count += 1;
         }
 
         if !utf8_buffer.is_empty() {
@@ -203,12 +300,24 @@ async fn stream_stem_tutor_inference(
             let _ = app.emit("adtc-token-stream", TokenPayload { token: emit_buffer });
         }
 
+        let gen_duration = gen_start.elapsed();
+        let tps = if gen_duration.as_secs_f32() > 0.0 {
+            gen_count as f32 / gen_duration.as_secs_f32()
+        } else {
+            0.0
+        };
+        eprintln!(
+            "Info: Generated {} tokens in {:?} ({:.2} tokens/sec)",
+            gen_count, gen_duration, tps
+        );
+
         Ok(())
     }).await.map_err(|e| format!("Task execution runtime fault: {:?}", e))?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    eprintln!("Info: Initializing Tauri application, pre-loading model...");
     if let Err(e) = get_model() {
         eprintln!("Warning: failed to pre-load model at startup: {e}");
     }

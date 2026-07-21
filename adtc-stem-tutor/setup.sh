@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
 
-# Navigate to Tauri directory and compile release binary
 cd "$(dirname "$0")/src-tauri"
-cargo build --release
+RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release
