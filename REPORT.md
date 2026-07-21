@@ -4,7 +4,7 @@
 
 **Domain:** mathematics_scientific_reasoning
 
-**Model:** Qwen3.5-4B-Q4_K_M.gguf (via Unsloth Dynamic 2.0)
+**Model:** Qwen3.5-2B-UD-Q4_K_XL.gguf (via Unsloth Dynamic 2.0)
 
 ---
 
@@ -20,7 +20,7 @@ Students can interact with the tutor to receive detailed scientific explanations
 
 ## Design Decisions
 
-### Base Model: `unsloth/Qwen3.5-4B-GGUF` (~4.0 Billion parameters)
+### Base Model: `unsloth/Qwen3.5-2B-UD-Q4_K_XL.gguf` (~2.0 Billion parameters)
 
 **Rationale:** Qwen 3.5's hybrid Gated DeltaNet and Gated Attention architecture provides exceptional mathematical and logical reasoning capacity, outperforming standard 3B/7B models. Additionally, its native support for over 201 languages enables robust regional localization (such as Swahili or French nuances) directly in offline environments.
 
