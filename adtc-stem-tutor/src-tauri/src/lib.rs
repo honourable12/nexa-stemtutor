@@ -16,7 +16,7 @@ static MODEL: OnceLock<LlamaModel> = OnceLock::new();
 
 const N_THREADS: i32 = 2;
 const N_CTX: u32 = 3072;
-const N_BATCH: u32 = 1024;
+const N_BATCH: u32 = 256;//change here
 
 fn get_backend() -> &'static LlamaBackend {
     BACKEND.get_or_init(|| {
@@ -130,8 +130,8 @@ fn build_context_params() -> LlamaContextParams {
         .with_n_threads(N_THREADS)
         .with_n_threads_batch(N_THREADS)
         // Set KV cache back to standard F16 for fast CPU prefill
-        .with_type_k(KvCacheType::Q8_0)
-        .with_type_v(KvCacheType::Q8_0)
+        .with_type_k(KvCacheType::F16)//changes made here
+        .with_type_v(KvCacheType::F16)//changes made here
         .with_offload_kqv(false)
 }
 
