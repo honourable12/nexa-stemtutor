@@ -59,7 +59,7 @@ struct TokenPayload {
 }
 
 fn locate_model_file() -> Result<PathBuf, String> {
-    let target_filename = "Qwen3.5-2B-UD-Q4_K_XL.gguf";
+    let target_filename = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
 
     // 1. Try relative paths from current working directory walking upwards
     if let Ok(cwd) = std::env::current_dir() {

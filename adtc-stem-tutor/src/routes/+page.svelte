@@ -29,7 +29,7 @@
   let numThreads = $state(4);
   let contextCap = $state(3072);
   let temperature = $state(0.1);
-  let selectedModel = $state("Qwen3.5-2B");
+  let selectedModel = $state("qwen2.5-1.5b-instruct");
 
   // Simulation State: 1. Solenoid (Electromagnetism)
   let solenoidCurrent = $state(2.5); // Amperes (-5A to 5A)
@@ -461,7 +461,7 @@
                      `[SYSTEM]: Thread Allocation: ${numThreads} Cores (Strict Pinning)\n` +
                      `[SYSTEM]: Context Cache Bound: ${contextCap} Max Tokens\n` +
                      `[SYSTEM]: Core Memory Allocation: FP16 Key-Value Cache Format\n` +
-                     `[SYSTEM]: Active Model Modelfile: /models/Qwen3.5-2B-UD-Q4_K_XL.gguf\n` +
+                     `[SYSTEM]: Active Model Modelfile: /models/qwen2.5-1.5b-instruct-q4_k_m.gguf\n` +
                      `[SYSTEM]: Feeding query input prompt context...\n\n` +
                      `[SYSTEM]: Initiating matrix calculations on CPU threads. Generating explanation:\n\n`;
 

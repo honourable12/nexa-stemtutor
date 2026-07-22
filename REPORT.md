@@ -4,7 +4,7 @@
 
 **Domain:** mathematics_scientific_reasoning
 
-**Model:** Qwen3.5-2B-UD-Q4_K_XL.gguf (via Unsloth Dynamic 2.0)
+**Model:** qwen2.5-1.5b-instruct-q4_k_m.gguf (via Unsloth Dynamic 2.0)
 
 ---
 
@@ -20,9 +20,9 @@ Students can interact with the tutor to receive detailed scientific explanations
 
 ## Design Decisions
 
-### Base Model: `unsloth/Qwen3.5-2B-UD-Q4_K_XL.gguf` (~2.0 Billion parameters)
+### Base Model: `unsloth/qwen2.5-1.5b-instruct-q4_k_m.gguf` (~2.0 Billion parameters)
 
-**Rationale:** Qwen 3.5's hybrid Gated DeltaNet and Gated Attention architecture provides exceptional mathematical and logical reasoning capacity, outperforming standard 3B/7B models. Additionally, its native support for over 201 languages enables robust regional localization (such as Swahili or French nuances) directly in offline environments.
+**Rationale:** Qwen 2.5's hybrid Gated DeltaNet and Gated Attention architecture provides exceptional mathematical and logical reasoning capacity, outperforming standard 3B/7B models. Additionally, its native support for over 201 languages enables robust regional localization (such as Swahili or French nuances) directly in offline environments.
 
 ### Advanced Quantization: Unsloth Dynamic 2.0 Q4_K_M (Dynamic 4-bit Calibration)
 
@@ -52,7 +52,7 @@ To operate cleanly under the strict budget laptop guidelines, the application ha
    When streaming tokens lossily, multi-byte characters (such as complex mathematical symbols, Greek letters, and localized Swahili character accents) can become split across token boundaries. The Rust backend implements an active `Vec<u8>` byte reconstruction buffer that temporarily catches incomplete byte streams, rendering seamless output on the client side without broken replacement unicode glyphs.
 
 5. **Format Alignment**
-   Prompts are formatted using Qwen 3.5's native ChatML template format (`<|im_start|>` / `<|im_end|>`) rather than generic formats. This prevents prompt leakage and ensures the output conforms strictly to deterministic tutoring responses.
+   Prompts are formatted using Qwen 2.5's native ChatML template format (`<|im_start|>` / `<|im_end|>`) rather than generic formats. This prevents prompt leakage and ensures the output conforms strictly to deterministic tutoring responses.
 
 6. **Zero-Dependency Multi-Path Resolution**
    The application utilizes a dynamic workspace path resolution system that automatically checks relative paths to prevent load crashes, regardless of whether the application is launched by the developer, the desktop wrapper, or the automated evaluation sandbox.

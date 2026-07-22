@@ -9,7 +9,7 @@ This project is a submission for the **Africa Deep Tech Challenge (ADTC) 2026** 
 ## 🚀 Key Features
 
 *   **100% Offline Inference:** Zero external network dependencies or APIs.
-*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Qwen3.5-2B-UD-Q4_K_XL` model (4B parameters).
+*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Qwen2.5-1.5b-instruct-q4_k_m` model (4B parameters).
 *   **Real-time 2D Lab Simulations:**
     *   **Electromagnetism (Solenoid):** Adjust turns, current, and core permeability to see dynamic magnetic flux vector lines.
     *   **Pendulum Swing Period:** Adjust gravity and length to visualize simple harmonic motion, comparing theoretical small-angle periods with actual elliptic integrals.
@@ -46,7 +46,7 @@ From the **root folder** of the project repository (which contains `download_mod
 ```bash
 bash download_model.sh
 ```
-This script will download the `Qwen3.5-2B-UD-Q4_K_XL.gguf` file (~2.9 GB) from Hugging Face and place it in the `model/` directory.
+This script will download the `qwen2.5-1.5b-instruct-q4_k_m.gguf` file (~2.9 GB) from Hugging Face and place it in the `model/` directory.
 
 ### 2. Install Frontend Dependencies
 Navigate into the `adtc-stem-tutor` folder and install NPM packages:
@@ -79,7 +79,7 @@ stemtutor/
 ├── metadata.json          ← Submission information and test prompts
 ├── REPORT.md              ← Technical report (problem, benchmarks)
 ├── model/
-│   └── Qwen3.5-2B-UD-Q4_K_XL.gguf  ← Downloaded GGUF weights (Ignored)
+│   └── qwen2.5-1.5b-instruct-q4_k_m.gguf  ← Downloaded GGUF weights (Ignored)
 └── adtc-stem-tutor/       ← Tauri app workspace
     ├── package.json
     ├── svelte.config.js

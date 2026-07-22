@@ -25,13 +25,13 @@
     }
   ],
   "model": {
-    "name": "Qwen3.5-2B-UD-Q4_K_XL.gguf",
+    "name": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
     "runtime": "llama.cpp",
     "quantization": "GGUF Q4_K_XL",
     "parameters_estimate": "2B",
     "packaging": "binary_bundle"
   },
   "_runtime": {
-    "model_path": "model/Qwen3.5-2B-UD-Q4_K_XL.gguf"
+    "model_path": "model/qwen2.5-1.5b-instruct-q4_k_m.gguf"
   }
 }
