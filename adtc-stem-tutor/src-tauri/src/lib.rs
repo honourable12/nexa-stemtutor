@@ -14,7 +14,7 @@ use tauri::{AppHandle, Emitter};
 static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
 static MODEL: OnceLock<LlamaModel> = OnceLock::new();
 
-const N_THREADS: i32 = 2;
+const N_THREADS: i32 = 4;
 const N_CTX: u32 = 3072;
 const N_BATCH: u32 = 256;//change here
 
@@ -164,10 +164,10 @@ async fn stream_stem_tutor_inference(
         let formatted_prompt = if student_prompt.starts_with("<|im_start|>") {
             student_prompt
         } else {
-            let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Respond directly without thinking tokens or internal reasoning blocks. Explain concepts step-by-step. Detail all mathematical derivations, physical laws, and chemical reactions clearly. Support multilingual outputs (e.g., Swahili, French) flawlessly.";
+            let system_prompt = "You are a Localized STEM Virtual Lab Tutor. Direct answer only. Do not output thinking blocks or <think> tags. Detail mathematical derivations step-by-step cleanly.";
             
             format!(
-                "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n",
+                "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
                 system_prompt,
                 student_prompt
             )
