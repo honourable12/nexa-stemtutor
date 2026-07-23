@@ -1,0 +1,6 @@
+[[permission]]
+identifier = "allow-stream-stem-tutor-inference"
+description = "Enables the stream_stem_tutor_inference command"
+
+[permission.commands]
+allow = ["stream_stem_tutor_inference"]
