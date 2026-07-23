@@ -1,3 +1,4 @@
+# Nexa Lab
 # Localized STEM Virtual Lab Tutor (ADTC 2026 Submission)
 
 A lightweight, 100% offline desktop application designed for standard budget laptops. It combines real-time interactive physics simulations (running at 60 FPS) with a localized virtual science tutor powered by an offline Large Language Model (LLM).
@@ -9,11 +10,17 @@ This project is a submission for the **Africa Deep Tech Challenge (ADTC) 2026** 
 ## 🚀 Key Features
 
 *   **100% Offline Inference:** Zero external network dependencies or APIs.
-*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Qwen2.5-1.5b-instruct-q4_k_m` model (4B parameters).
+*   **Virtual Science Tutor:** Interactive explanations, derivations, and formulas powered by the quantized `Qwen2.5-1.5b-instruct-q4_k_m` model.
 *   **Real-time 2D Lab Simulations:**
+    *   **Optics (Spherical Lenses):** Full interactive support for **both Convex (Converging) and Concave (Diverging) lenses**. Real-time calculation of image distance ($d_i$) and linear magnification ($m$) using the thin lens equation:
+        $$\frac{1}{f} = \frac{1}{d_o} + \frac{1}{d_i}$$
+        Dynamic ray tracing of three principal rays (parallel, chief, and focal) with correct inverted/upright arrows and dashed virtual backtracking guides.
     *   **Electromagnetism (Solenoid):** Adjust turns, current, and core permeability to see dynamic magnetic flux vector lines.
     *   **Pendulum Swing Period:** Adjust gravity and length to visualize simple harmonic motion, comparing theoretical small-angle periods with actual elliptic integrals.
     *   **Ideal Gas Kinetic Theory:** Vary temperature, volume, and particles to view molecular collisions and real-time wall-pressure calculation.
+*   **AI-Guided Experiment Start:** Single-click **Start Experiment** button introduces objectives, physical principles, relevant equations, and suggests parameters to modify.
+*   **Lab Report Assistant:** Single-click **Write Lab Report** button generates a complete structured lab report (Title, Objectives, Theory, Setup, Observations, Data Analysis, and Conclusion) using active parameters. Includes a persistent lab report writing guide artifact.
+*   **Offline LaTeX & Markdown Rendering:** Fully bundled local `katex` package and custom markdown tokenizer inside Svelte rendering, guaranteeing flawless formula rendering and rich formatting (bold, italic, list items, code snippets) with zero network dependency.
 *   **Resource Constraints Optimized:** Pure CPU execution pinned to 4 threads, limited context window of 3072 tokens, and FP16 KV cache to run comfortably on standard 8GB RAM laptops without OOM panics.
 
 ---
@@ -78,6 +85,7 @@ stemtutor/
 ├── download_model.sh      ← Root script to download weights
 ├── metadata.json          ← Submission information and test prompts
 ├── REPORT.md              ← Technical report (problem, benchmarks)
+├── README.md              ← General project overview and setup documentation
 ├── model/
 │   └── qwen2.5-1.5b-instruct-q4_k_m.gguf  ← Downloaded GGUF weights (Ignored)
 └── adtc-stem-tutor/       ← Tauri app workspace
