@@ -144,7 +144,7 @@
 <header class="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
   <div class="flex items-center gap-8">
     <div class="flex items-center gap-2">
-      <div class="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">N</div>
+      <img src="/nexus.png" alt="Nexa Lab Logo" class="w-7 h-7 object-contain rounded-lg" />
       <h1 class="text-xl font-bold tracking-wider text-blue-700 uppercase">NEXA LAB</h1>
     </div>
     <nav class="flex gap-6 font-medium text-sm">
@@ -457,7 +457,7 @@
   <aside class="w-96 bg-white border border-slate-200 rounded-xl flex flex-col justify-between overflow-hidden">
     <div class="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">🤖</div>
+        <img src="/nexus.png" alt="Nexa Lab Logo" class="w-7 h-7 object-contain rounded-lg" />
         <div>
           <h3 class="text-xs font-bold text-slate-900">Nexa STEM Tutor</h3>
           <p class="text-[10px] text-blue-600 font-mono">● {isGenerating ? 'GENERATING...' : 'ONLINE'}</p>
