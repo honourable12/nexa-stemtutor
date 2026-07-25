@@ -14,9 +14,8 @@ use tauri::{AppHandle, Emitter};
 static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
 static MODEL: OnceLock<LlamaModel> = OnceLock::new();
 
-const N_THREADS: i32 = 4;
 const N_CTX: u32 = 3072;
-const N_BATCH: u32 = 256;//change here
+const N_BATCH: u32 = 512;
 
 fn get_backend() -> &'static LlamaBackend {
     BACKEND.get_or_init(|| {
@@ -122,16 +121,34 @@ fn locate_model_file() -> Result<PathBuf, String> {
     Err(err_msg)
 }
 
+pub fn detect_thread_split() -> (i32, i32) {
+    let physical_cores = num_cpus::get_physical() as i32;
+
+    let decode_threads = match physical_cores {
+        1..=2 => physical_cores,
+        3..=8 => physical_cores - 1,
+        _ => 8,
+    };
+
+    let prefill_threads = match physical_cores {
+        1..=2 => physical_cores,
+        _ => (physical_cores - 1).min(12),
+    };
+
+    (decode_threads, prefill_threads)
+}
+
 fn build_context_params() -> LlamaContextParams {
+    let (n_decode, n_prefill) = detect_thread_split();
+    
     LlamaContextParams::default()
         .with_n_ctx(std::num::NonZeroU32::new(N_CTX))
         .with_n_batch(N_BATCH)
         .with_n_ubatch(N_BATCH)
-        .with_n_threads(N_THREADS)
-        .with_n_threads_batch(N_THREADS)
-        // Set KV cache back to standard F16 for fast CPU prefill
-        .with_type_k(KvCacheType::F16)//changes made here
-        .with_type_v(KvCacheType::F16)//changes made here
+        .with_n_threads(n_decode)
+        .with_n_threads_batch(n_prefill)
+        .with_type_k(KvCacheType::Q8_0)
+        .with_type_v(KvCacheType::Q8_0)
         .with_offload_kqv(false)
 }
 

@@ -1,4 +1,4 @@
-# Technical Report — Localized STEM Virtual Lab Tutor
+# Technical Report — Nexa Lab — Localized STEM Virtual Lab Tutor
 
 **Team ID:** adtc-2026-stemtutor
 

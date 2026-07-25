@@ -1,8 +1,8 @@
 # ADTC 2026 Laptop LLM Challenge gitignore
 
 # Model weights
-/model/
-*.gguf
+/model/*.gguf
+
 
 # SvelteKit dev & build dependencies
 /adtc-stem-tutor/node_modules/
