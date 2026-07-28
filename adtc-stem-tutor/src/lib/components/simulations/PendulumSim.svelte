@@ -48,6 +48,7 @@
       // Physics integration (Euler-Cromer)
       const g = $labState.gravity;
       const L = $labState.length;
+      const mass = $labState.mass || 1.0;
       let dampingCoeff = 0.0;
       if ($labState.damping === 'Low (Air Friction)') {
         dampingCoeff = 0.08;
@@ -55,8 +56,8 @@
         dampingCoeff = 0.6;
       }
 
-      // angular acceleration alpha = -(g/L)*sin(theta) - damping*omega
-      const alpha = -(g / L) * Math.sin(theta) - dampingCoeff * omega;
+      // angular acceleration alpha = -(g/L)*sin(theta) - (damping/mass)*omega
+      const alpha = -(g / L) * Math.sin(theta) - (dampingCoeff / mass) * omega;
       omega += alpha * dt;
       theta += omega * dt;
 
@@ -156,29 +157,30 @@
       ctx.shadowColor = '#22d3ee';
       ctx.shadowBlur = 12;
       
-      const grad = ctx.createRadialGradient(bobX, bobY, 2, bobX, bobY, 16);
+      const bobRadius = 10 + 6 * Math.sqrt(mass);
+      const grad = ctx.createRadialGradient(bobX, bobY, 2, bobX, bobY, bobRadius);
       grad.addColorStop(0, '#e0f7fa');
       grad.addColorStop(0.4, '#22d3ee');
       grad.addColorStop(1, '#0891b2');
 
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(bobX, bobY, 16, 0, Math.PI * 2);
+      ctx.arc(bobX, bobY, bobRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(bobX, bobY, 16, 0, Math.PI * 2);
+      ctx.arc(bobX, bobY, bobRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // Bob mass text
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 10px sans-serif';
+      ctx.font = bobRadius > 14 ? 'bold 10px sans-serif' : 'bold 8px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('m', bobX, bobY);
+      ctx.fillText(`${mass.toFixed(1)}kg`, bobX, bobY);
 
       // --- 6. Draw Dashboard Text on Canvas ---
       ctx.fillStyle = '#94a3b8';
@@ -186,6 +188,7 @@
       ctx.textAlign = 'left';
       ctx.fillText(`ANGLE θ: ${(theta * 180 / Math.PI).toFixed(1)}°`, 20, 30);
       ctx.fillText(`ANGULAR VEL (ω): ${omega.toFixed(2)} rad/s`, 20, 48);
+      ctx.fillText(`MASS (m): ${mass.toFixed(2)} kg`, 20, 66);
 
       animationFrameId = requestAnimationFrame(loop);
     };

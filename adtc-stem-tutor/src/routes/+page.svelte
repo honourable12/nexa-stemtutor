@@ -84,7 +84,7 @@
     // Build context info based on active experiment/parameters
     let labContextInfo = "";
     if ($currentModule === 'Mechanics') {
-      labContextInfo = `Current Experiment: Simple Pendulum. Active parameters: length (L) = ${$labState.length.toFixed(2)} meters, initial swing angle (theta) = ${$labState.angle} degrees, damping = ${$labState.damping}, gravity (g) = ${$labState.gravity.toFixed(2)} m/s^2, calculated theoretical period (T) = ${$labState.period} seconds.`;
+      labContextInfo = `Current Experiment: Simple Pendulum. Active parameters: length (L) = ${$labState.length.toFixed(2)} meters, initial swing angle (theta) = ${$labState.angle} degrees, damping = ${$labState.damping}, gravity (g) = ${$labState.gravity.toFixed(2)} m/s^2, mass (m) = ${$labState.mass.toFixed(2)} kg, calculated theoretical period (T) = ${$labState.period} seconds.`;
     } else if ($currentModule === 'Optics') {
       const isConcave = $labState.opticsLensType === 'Concave';
       const f = isConcave ? -$labState.opticsFocalLength : $labState.opticsFocalLength;
@@ -273,6 +273,14 @@
               <span class="text-blue-600 font-mono">{$labState.angle}°</span>
             </div>
             <input type="range" min="5" max="90" step="1" bind:value={$labState.angle} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span>Mass (m)</span>
+              <span class="text-blue-600 font-mono">{$labState.mass.toFixed(2)} kg</span>
+            </div>
+            <input type="range" min="0.1" max="5.0" step="0.1" bind:value={$labState.mass} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
           </div>
         </div>
 
