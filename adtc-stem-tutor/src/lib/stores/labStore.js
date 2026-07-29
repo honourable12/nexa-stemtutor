@@ -1,10 +1,10 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 
-export const currentModule = writable('Mechanics'); // Mechanics, Optics, Thermodynamics, Electromagnetism
+export const currentModule = writable('Mechanics'); // Mechanics, Optics, Thermodynamics, Electromagnetism, Chemistry
 export const currentLanguage = writable('EN'); // EN, FR, SW
 
 export const labState = writable({
-  experiment: 'simple_pendulum', // simple_pendulum, solenoid, ideal_gas, optics_lens
+  experiment: 'simple_pendulum', // simple_pendulum, solenoid, ideal_gas, optics_lens, titration
   length: 1.00, // meters
   angle: 30, // degrees
   damping: 'None',
@@ -26,7 +26,55 @@ export const labState = writable({
   opticsObjectDistance: 45, // cm
   opticsFocalLength: 20, // cm
   opticsObjectHeight: 15, // cm
-  opticsLensType: 'Convex' // Convex, Concave
+  opticsLensType: 'Convex', // Convex, Concave
+
+  // Chemistry Titration parameters (kept for legacy support if needed)
+  titrationAddedVolume: 0.0, // mL
+  titrationTitrantConc: 0.10, // M
+  titrationAnalyteVolume: 25.0, // mL
+  titrationAnalyteConc: 0.10, // M
+  titrationIndicator: 'Phenolphthalein', // Phenolphthalein, Methyl Orange, Bromothymol Blue
+  titrationTitrant: 'NaOH',
+  titrationAnalyte: 'HCl'
+});
+
+export const titrationState = writable({
+  titrant: 'NaOH',
+  analyte: 'HCl',
+  addedVolume: 0.0, // mL
+  indicator: 'Phenolphthalein',
+  titrantConc: 0.10, // M
+  analyteVolume: 25.0, // mL
+  analyteConc: 0.10 // M
+});
+
+export const currentPH = derived(titrationState, ($state) => {
+  const vAcid = $state.analyteVolume;
+  const cAcid = $state.analyteConc;
+  const cBase = $state.titrantConc;
+  const vAdded = $state.addedVolume;
+  
+  const molesAcid = cAcid * (vAcid / 1000);
+  const molesBase = cBase * (vAdded / 1000);
+  const totalVolL = (vAcid + vAdded) / 1000;
+  
+  if (molesBase < molesAcid) {
+    // Before equivalence point (excess acid)
+    const excessAcidMoles = molesAcid - molesBase;
+    const hConc = excessAcidMoles / totalVolL;
+    const ph = -Math.log10(Math.max(hConc, 1e-14));
+    return parseFloat(ph.toFixed(2));
+  } else if (Math.abs(molesAcid - molesBase) < 1e-9) {
+    // Equivalence point
+    return 7.00;
+  } else {
+    // After equivalence point (excess base)
+    const excessBaseMoles = molesBase - molesAcid;
+    const ohConc = excessBaseMoles / totalVolL;
+    const pOH = -Math.log10(Math.max(ohConc, 1e-14));
+    const ph = 14.0 - pOH;
+    return parseFloat(ph.toFixed(2));
+  }
 });
 
 export const chatMessages = writable([

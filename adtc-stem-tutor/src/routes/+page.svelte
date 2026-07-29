@@ -8,7 +8,9 @@
     labState, 
     chatMessages, 
     isModuleModalOpen, 
-    isHardwareModalOpen 
+    isHardwareModalOpen,
+    titrationState,
+    currentPH
   } from '$lib/stores/labStore';
 
   // Import components
@@ -21,6 +23,7 @@
   import SolenoidSim from '$lib/components/simulations/SolenoidSim.svelte';
   import GasSim from '$lib/components/simulations/GasSim.svelte';
   import OpticsSim from '$lib/components/simulations/OpticsSim.svelte';
+  import TitrationStage from '$lib/components/simulations/TitrationSim.svelte';
 
   let userInput = "";
   let isGenerating = false;
@@ -35,6 +38,8 @@
       $labState.experiment = 'ideal_gas';
     } else if ($currentModule === 'Electromagnetism') {
       $labState.experiment = 'solenoid';
+    } else if ($currentModule === 'Chemistry') {
+      $labState.experiment = 'titration';
     }
   }
 
@@ -44,6 +49,8 @@
     const g = $labState.gravity;
     $labState.period = parseFloat((2 * Math.PI * Math.sqrt(L / g)).toFixed(2));
   }
+
+  // Chemistry titration pH is imported as $currentPH from labStore.js
 
   // Handle stream from Tauri backend
   onMount(() => {
@@ -118,6 +125,8 @@
       const permeability = $labState.solenoidPermeability;
       const B = Math.abs(current) * turns * (permeability / 1000);
       labContextInfo = `Current Experiment: Solenoid Electromagnetism. Active parameters: number of turns (N) = ${turns}, electric current (I) = ${current.toFixed(1)} Amperes, relative permeability of core (mu_r) = ${permeability}, calculated magnetic flux index (B) = ${B.toFixed(2)}.`;
+    } else if ($currentModule === 'Chemistry') {
+      labContextInfo = `Current Experiment: Acid-Base Titration. Active parameters: titrant = ${$titrationState.titrant}, analyte = ${$titrationState.analyte}, titrant concentration = ${$titrationState.titrantConc} M, analyte volume = ${$titrationState.analyteVolume} mL, current pH = ${$currentPH}, indicator = ${$titrationState.indicator}.`;
     }
 
     // Set correct system prompt based on active language
@@ -127,8 +136,25 @@
       ? `Wewe ni Mwalimu wa Maabara ya STEM ya Ndani. Jibu moja kwa moja na kwa Kiswahili pekee. Usitoe mawazo au lebo za <think>. Eleza hatua kwa hatua makadirio yote ya hesabu. Maelezo ya sasa ya maabara: ${labContextInfo}`
       : `You are a Localized STEM Virtual Lab Tutor. Direct answer only in English. Do not output thinking blocks or <think> tags. Detail mathematical derivations step-by-step cleanly. Current virtual lab context: ${labContextInfo}`;
 
+    let studentPrompt = textToSend;
+    let userText = textToSend;
+    if ($currentModule === 'Chemistry') {
+      const promptContext = `
+[Nexa Context: Chemistry Module - Titration]
+- Titrant: ${$titrationState.titrant}
+- Analyte: ${$titrationState.analyte}
+- Added Volume: ${$titrationState.addedVolume} mL / 50.0 mL
+- Current pH: ${$currentPH}
+- Indicator: ${$titrationState.indicator} (Color: ${$currentPH > 8.2 ? 'Pink' : 'Colorless'})
+- Equivalence Point Reached: ${$titrationState.addedVolume === 25.0 ? 'YES' : 'NO'}
+
+Student Question: ${studentPrompt}
+`;
+      userText = promptContext;
+    }
+
     // Package prompt with system prompt using ChatML formatting
-    const formattedPrompt = `<|im_start|>system\n${sysPromptLang}<|im_end|>\n<|im_start|>user\n${textToSend}<|im_end|>\n<|im_start|>assistant\n`;
+    const formattedPrompt = `<|im_start|>system\n${sysPromptLang}<|im_end|>\n<|im_start|>user\n${userText}<|im_end|>\n<|im_start|>assistant\n`;
 
     try {
       await invoke('stream_stem_tutor_inference', { studentPrompt: formattedPrompt });
@@ -148,7 +174,7 @@
       <h1 class="text-xl font-bold tracking-wider text-blue-700 uppercase">NEXA LAB</h1>
     </div>
     <nav class="flex gap-6 font-medium text-sm">
-      {#each ['Mechanics', 'Optics', 'Thermodynamics', 'Electromagnetism'] as mod}
+      {#each ['Mechanics', 'Optics', 'Thermodynamics', 'Electromagnetism', 'Chemistry'] as mod}
         <button 
           class="pb-1 transition-all {$currentModule === mod ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-800'}"
           on:click={() => $currentModule = mod}
@@ -249,6 +275,11 @@
           ● THIN LENS OPTICS
         </div>
         <OpticsSim />
+      {:else if $labState.experiment === 'titration'}
+        <div class="absolute top-4 left-4 bg-slate-800/80 backdrop-blur border border-slate-700 px-3 py-1 rounded text-xs text-slate-300 font-mono tracking-wider z-10">
+          ● ACID-BASE TITRATION
+        </div>
+        <TitrationStage />
       {/if}
     </div>
 
@@ -457,6 +488,44 @@
             </span>
           </div>
         </div>
+      {:else if $currentModule === 'Chemistry'}
+        <!-- Chemistry (Titration) -->
+        <div class="flex-1 space-y-4">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Titration Parameters</h3>
+          
+          <div>
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span>Titrant Concentration (M₁)</span>
+              <span class="text-blue-600 font-mono">{$titrationState.titrantConc.toFixed(2)} M</span>
+            </div>
+            <input type="range" min="0.05" max="0.50" step="0.01" bind:value={$titrationState.titrantConc} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span>Analyte Volume (V₂)</span>
+              <span class="text-blue-600 font-mono">{$titrationState.analyteVolume.toFixed(1)} mL</span>
+            </div>
+            <input type="range" min="10.0" max="50.0" step="0.5" bind:value={$titrationState.analyteVolume} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
+          </div>
+        </div>
+
+        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Chemical Settings</h3>
+          <div>
+            <label for="indicator-select" class="block text-xs font-medium text-slate-600 mb-1">Indicator Selection</label>
+            <select id="indicator-select" bind:value={$titrationState.indicator} class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium">
+              <option value="Phenolphthalein">Phenolphthalein</option>
+              <option value="Methyl Orange">Methyl Orange</option>
+              <option value="Bromothymol Blue">Bromothymol Blue</option>
+            </select>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-lg flex items-center justify-between text-xs">
+            <span class="text-slate-500">Current pH:</span>
+            <span class="font-mono font-bold text-slate-800">{$currentPH.toFixed(2)}</span>
+          </div>
+        </div>
       {/if}
     </div>
   </main>
@@ -566,6 +635,25 @@
             on:click={() => sendPrompt("Explain how current direction and permeability affect polarity.")}
           >
             EXPLAIN IN SIMPLER TERMS
+          </button>
+        {:else if $currentModule === 'Chemistry'}
+          <button 
+            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+            on:click={() => sendPrompt("Explain the equivalence point buffer equation")}
+          >
+            Explain the equivalence point buffer equation
+          </button>
+          <button 
+            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+            on:click={() => sendPrompt("Derive $pH = -\\log_{10}[H^+]$ for this step")}
+          >
+            Derive $pH = -\log_{10}[H^+]$ for this step
+          </button>
+          <button 
+            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+            on:click={() => sendPrompt("Why did the phenolphthalein color disappear?")}
+          >
+            Why did the phenolphthalein color disappear?
           </button>
         {/if}
       </div>
