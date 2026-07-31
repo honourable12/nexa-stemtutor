@@ -28,6 +28,44 @@
   let userInput = "";
   let isGenerating = false;
 
+  // Titration Simulation Controls & State
+  let titrationSimInstance: any;
+  let isFlowing = false;
+  let flowRate = 1.0;
+
+  function getIndicatorRangeText(ind: string) {
+    if (ind === 'Phenolphthalein') return '8.2 - 9.8';
+    if (ind === 'Methyl Orange') return '3.1 - 4.4';
+    if (ind === 'Bromothymol Blue') return '6.0 - 7.6';
+    return '';
+  }
+  
+  function getIndicatorGradientStyle(ind: string) {
+    if (ind === 'Phenolphthalein') {
+      return 'background: linear-gradient(to right, rgba(226, 232, 240, 0.15) 0%, rgba(226, 232, 240, 0.15) 58%, rgba(244, 63, 94, 0.8) 70%, rgba(244, 63, 94, 0.8) 100%)';
+    }
+    if (ind === 'Methyl Orange') {
+      return 'background: linear-gradient(to right, rgba(239, 68, 68, 0.8) 0%, rgba(239, 68, 68, 0.8) 22%, rgba(245, 158, 11, 0.8) 27%, rgba(234, 179, 8, 0.8) 32%, rgba(234, 179, 8, 0.8) 100%)';
+    }
+    if (ind === 'Bromothymol Blue') {
+      return 'background: linear-gradient(to right, rgba(234, 179, 8, 0.8) 0%, rgba(234, 179, 8, 0.8) 42%, rgba(34, 197, 94, 0.8) 48%, rgba(59, 130, 246, 0.8) 54%, rgba(59, 130, 246, 0.8) 100%)';
+    }
+    return 'background: rgba(226, 232, 240, 0.1)';
+  }
+
+  function getIndicatorDescription(ind: string) {
+    if (ind === 'Phenolphthalein') {
+      return 'Phenolphthalein is colorless in acidic solution (pH < 8.2) and transitions to pink in basic solution (pH > 9.8).';
+    }
+    if (ind === 'Methyl Orange') {
+      return 'Methyl Orange is red in strongly acidic solution (pH < 3.1) and transitions to yellow/orange in weaker acid (pH > 4.4).';
+    }
+    if (ind === 'Bromothymol Blue') {
+      return 'Bromothymol Blue is yellow in acidic solution (pH < 6.0), transitions through green, and turns blue in basic solution (pH > 7.6).';
+    }
+    return '';
+  }
+
   // Reactively sync currentModule to labState experiment
   $: {
     if ($currentModule === 'Mechanics') {
@@ -279,7 +317,7 @@ Student Question: ${studentPrompt}
         <div class="absolute top-4 left-4 bg-slate-800/80 backdrop-blur border border-slate-700 px-3 py-1 rounded text-xs text-slate-300 font-mono tracking-wider z-10">
           ● ACID-BASE TITRATION
         </div>
-        <TitrationStage />
+        <TitrationStage bind:this={titrationSimInstance} bind:isFlowing={isFlowing} bind:flowRate={flowRate} />
       {/if}
     </div>
 
@@ -490,12 +528,13 @@ Student Question: ${studentPrompt}
         </div>
       {:else if $currentModule === 'Chemistry'}
         <!-- Chemistry (Titration) -->
+        <!-- Col 1: Titration Parameters -->
         <div class="flex-1 space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Titration Parameters</h3>
           
           <div>
             <div class="flex justify-between text-xs font-medium mb-1">
-              <span>Titrant Concentration (M₁)</span>
+              <span class="text-slate-700">Titrant Concentration (M₁)</span>
               <span class="text-blue-600 font-mono">{$titrationState.titrantConc.toFixed(2)} M</span>
             </div>
             <input type="range" min="0.05" max="0.50" step="0.01" bind:value={$titrationState.titrantConc} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
@@ -503,28 +542,160 @@ Student Question: ${studentPrompt}
 
           <div>
             <div class="flex justify-between text-xs font-medium mb-1">
-              <span>Analyte Volume (V₂)</span>
+              <span class="text-slate-700">Analyte Volume (V₂)</span>
               <span class="text-blue-600 font-mono">{$titrationState.analyteVolume.toFixed(1)} mL</span>
             </div>
             <input type="range" min="10.0" max="50.0" step="0.5" bind:value={$titrationState.analyteVolume} class="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
           </div>
         </div>
 
-        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
-          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Chemical Settings</h3>
-          <div>
-            <label for="indicator-select" class="block text-xs font-medium text-slate-600 mb-1">Indicator Selection</label>
-            <select id="indicator-select" bind:value={$titrationState.indicator} class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium">
-              <option value="Phenolphthalein">Phenolphthalein</option>
-              <option value="Methyl Orange">Methyl Orange</option>
-              <option value="Bromothymol Blue">Bromothymol Blue</option>
-            </select>
+        <!-- Col 2: Simulation Controls -->
+        <div class="flex-1 border-l border-slate-100 pl-8 space-y-3">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Simulation Controls</h3>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] text-slate-400 font-semibold">Eq. Point:</span>
+              <span class="text-[9px] font-mono font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                {($titrationState.analyteVolume * ($titrationState.analyteConc / $titrationState.titrantConc)).toFixed(2)} mL
+              </span>
+            </div>
+          </div>
+          
+          <!-- Flow Control buttons -->
+          <div class="flex gap-2">
+            {#if !isFlowing}
+              <button 
+                class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-1.5 px-3 rounded text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm border border-emerald-500 cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                on:click={() => isFlowing = true}
+                disabled={$titrationState.addedVolume >= 50.0}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                START
+              </button>
+            {:else}
+              <button 
+                class="flex-1 bg-amber-600 hover:bg-amber-600 text-white font-semibold py-1.5 px-3 rounded text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm border border-amber-500 cursor-pointer active:scale-95"
+                on:click={() => isFlowing = false}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                PAUSE
+              </button>
+            {/if}
+            
+            <button 
+              class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-1.5 px-3 rounded text-xs transition-all flex items-center justify-center gap-1 shadow-sm border border-slate-300 cursor-pointer active:scale-95"
+              on:click={() => titrationSimInstance?.resetTitration()}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3 3 3"/></svg>
+              RESET
+            </button>
           </div>
 
-          <div class="bg-slate-50 border border-slate-200 p-2.5 rounded-lg flex items-center justify-between text-xs">
-            <span class="text-slate-500">Current pH:</span>
-            <span class="font-mono font-bold text-slate-800">{$currentPH.toFixed(2)}</span>
+          <!-- Flow rate slider -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center text-[10px] font-medium">
+              <span class="text-slate-500">Flow Speed:</span>
+              <span class="font-mono font-bold text-blue-600">{flowRate.toFixed(2)} mL/s</span>
+            </div>
+            <input 
+              type="range" 
+              min="0.1" 
+              max="3.0" 
+              step="0.1" 
+              bind:value={flowRate} 
+              class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+            />
           </div>
+
+          <!-- Fine Drop Additions -->
+          <div class="space-y-1">
+            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Fine Drop Additions</span>
+            <div class="grid grid-cols-4 gap-1.5">
+              <button 
+                class="bg-slate-50 hover:bg-slate-100 text-slate-800 py-1.5 px-1 rounded text-[10px] font-mono font-semibold transition-all border border-slate-200 cursor-pointer hover:border-blue-500 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                on:click={() => titrationSimInstance?.triggerManualAddition(0.05)}
+                disabled={$titrationState.addedVolume >= 50.0}
+                title="Add 1 Drop (+0.05 mL)"
+              >
+                +0.05
+              </button>
+              <button 
+                class="bg-slate-50 hover:bg-slate-100 text-slate-800 py-1.5 px-1 rounded text-[10px] font-mono font-semibold transition-all border border-slate-200 cursor-pointer hover:border-blue-500 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                on:click={() => titrationSimInstance?.triggerManualAddition(0.20)}
+                disabled={$titrationState.addedVolume >= 50.0}
+                title="Add 4 Drops (+0.20 mL)"
+              >
+                +0.20
+              </button>
+              <button 
+                class="bg-slate-50 hover:bg-slate-100 text-slate-800 py-1.5 px-1 rounded text-[10px] font-mono font-semibold transition-all border border-slate-200 cursor-pointer hover:border-blue-500 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                on:click={() => titrationSimInstance?.triggerManualAddition(1.00)}
+                disabled={$titrationState.addedVolume >= 50.0}
+                title="Fast addition (+1.00 mL)"
+              >
+                +1.00
+              </button>
+              <button 
+                class="bg-slate-50 hover:bg-slate-100 text-slate-800 py-1.5 px-1 rounded text-[10px] font-mono font-semibold transition-all border border-slate-200 cursor-pointer hover:border-blue-500 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                on:click={() => titrationSimInstance?.triggerManualAddition(5.00)}
+                disabled={$titrationState.addedVolume >= 50.0}
+                title="Pour addition (+5.00 mL)"
+              >
+                +5.00
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col 3: Chemical Settings & Indicator Spectrum -->
+        <div class="w-80 border-l border-slate-100 pl-8 space-y-2">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Chemical Settings</h3>
+          
+          <div class="flex gap-4">
+            <div class="flex-1">
+              <label for="indicator-select" class="block text-[10px] font-medium text-slate-500 mb-0.5">Indicator Selection</label>
+              <select id="indicator-select" bind:value={$titrationState.indicator} class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-medium focus:outline-none focus:border-blue-500">
+                <option value="Phenolphthalein">Phenolphthalein</option>
+                <option value="Methyl Orange">Methyl Orange</option>
+                <option value="Bromothymol Blue">Bromothymol Blue</option>
+              </select>
+            </div>
+
+            <div class="w-24 text-center">
+              <span class="block text-[10px] font-medium text-slate-500 mb-0.5">Current pH</span>
+              <div class="bg-slate-50 border border-slate-200 p-1.5 rounded-lg font-mono font-bold text-slate-800 text-xs">
+                {$currentPH.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Indicator Spectrum -->
+          <div class="space-y-1 relative pt-1">
+            <div class="flex justify-between text-[8px] text-slate-400 font-semibold px-0.5">
+              <span>pH 0</span>
+              <span>{getIndicatorRangeText($titrationState.indicator)}</span>
+              <span>pH 14</span>
+            </div>
+            
+            <div 
+              class="w-full h-3 rounded border border-slate-300 relative shadow-inner overflow-visible"
+              style={getIndicatorGradientStyle($titrationState.indicator)}
+            >
+              <!-- Pointer at current pH -->
+              <div 
+                class="absolute -top-1.5 -bottom-1.5 w-1 bg-white border border-slate-900 shadow shadow-black transition-all duration-700 ease-out"
+                style="left: calc({($currentPH / 14.0) * 100}% - 2px);"
+              >
+                <!-- Tooltip dot -->
+                <div class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-blue-500 border border-white"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description text -->
+          <p class="text-[9px] text-slate-500 leading-normal line-clamp-2 mt-1">
+            {getIndicatorDescription($titrationState.indicator)}
+          </p>
         </div>
       {/if}
     </div>
