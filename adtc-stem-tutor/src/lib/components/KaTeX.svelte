@@ -120,7 +120,7 @@
     {#if part.type === 'text'}
       <span class="whitespace-pre-wrap">{@html renderMarkdown(part.content)}</span>
     {:else if part.type === 'math'}
-      <span class={part.display ? "block my-2 text-center" : "inline-block px-1"}>
+      <span class={part.display ? "block my-2 text-center overflow-x-auto max-w-full" : "inline-block px-1"}>
         {@html renderMath(part.content, part.display)}
       </span>
     {/if}

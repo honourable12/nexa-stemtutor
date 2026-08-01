@@ -32,6 +32,17 @@
   let titrationSimInstance: any;
   let isFlowing = false;
   let flowRate = 1.0;
+  let isChatOpen = true;
+
+  let windowWidth = 1280;
+  let windowHeight = 800;
+
+  // Reactively close chat if window width gets too small
+  let previousWidth = 1280;
+  $: if (windowWidth < 1024 && previousWidth >= 1024) {
+    isChatOpen = false;
+  }
+  $: previousWidth = windowWidth;
 
   function getIndicatorRangeText(ind: string) {
     if (ind === 'Phenolphthalein') return '8.2 - 9.8';
@@ -92,6 +103,10 @@
 
   // Handle stream from Tauri backend
   onMount(() => {
+    if (window.innerWidth < 1280) {
+      isChatOpen = false;
+    }
+
     let unlisten: (() => void) | undefined;
     
     listen<{ token: string }>('adtc-token-stream', (event) => {
@@ -204,14 +219,16 @@ Student Question: ${studentPrompt}
   }
 </script>
 
+<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
+
 <!-- Top Navigation Bar -->
-<header class="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
-  <div class="flex items-center gap-8">
+<header class="h-14 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between">
+  <div class="flex items-center gap-3 lg:gap-8">
     <div class="flex items-center gap-2">
-      <img src="/nexus.png" alt="Nexa Lab Logo" class="w-7 h-7 object-contain rounded-lg" />
-      <h1 class="text-xl font-bold tracking-wider text-blue-700 uppercase">NEXA LAB</h1>
+      <img src="/nexus.png" alt="Nexa Lab Logo" class="w-6 h-6 md:w-7 md:h-7 object-contain rounded-lg" />
+      <h1 class="text-sm lg:text-base xl:text-xl font-bold tracking-wider text-blue-700 uppercase hidden sm:block">NEXA LAB</h1>
     </div>
-    <nav class="flex gap-6 font-medium text-sm">
+    <nav class="flex gap-2 lg:gap-6 font-medium text-[11px] lg:text-sm">
       {#each ['Mechanics', 'Optics', 'Thermodynamics', 'Electromagnetism', 'Chemistry'] as mod}
         <button 
           class="pb-1 transition-all {$currentModule === mod ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-800'}"
@@ -223,69 +240,83 @@ Student Question: ${studentPrompt}
     </nav>
   </div>
 
-  <div class="flex items-center gap-4 text-xs font-semibold">
+  <div class="flex items-center gap-2 lg:gap-4 text-xs font-semibold">
     <div class="flex border border-slate-200 rounded p-0.5 bg-slate-50">
       {#each ['EN', 'FR', 'SW'] as lang}
         <button 
-          class="px-2 py-0.5 rounded transition-all {$currentLanguage === lang ? 'bg-blue-600 text-white' : 'text-slate-600'}"
+          class="px-1.5 lg:px-2 py-0.5 rounded transition-all text-[10px] lg:text-xs {$currentLanguage === lang ? 'bg-blue-600 text-white' : 'text-slate-600'}"
           on:click={() => $currentLanguage = lang}
         >
           {lang}
         </button>
       {/each}
     </div>
-    <button class="p-1.5 text-slate-500 hover:text-slate-700">🌐</button>
-    <button class="p-1.5 text-slate-500 hover:text-slate-700">⚙️</button>
-    <button class="p-1.5 text-slate-500 hover:text-slate-700">👤</button>
+    <button 
+      class="flex items-center gap-1 px-2 py-1 lg:px-2.5 lg:py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition-all font-semibold cursor-pointer shadow-sm active:scale-95 text-[10px] lg:text-xs"
+      on:click={() => isChatOpen = !isChatOpen}
+      title="Toggle Nexa STEM Tutor panel"
+    >
+      💬 <span class="hidden sm:inline">{isChatOpen ? 'Hide Chat' : 'Show Chat'}</span>
+    </button>
+    <button class="p-1 text-slate-500 hover:text-slate-700 hidden md:block">🌐</button>
+    <button class="p-1 text-slate-500 hover:text-slate-700 hidden md:block">⚙️</button>
+    <button class="p-1 text-slate-500 hover:text-slate-700 hidden md:block">👤</button>
   </div>
 </header>
 
 <!-- Main Workbench Body -->
-<div class="flex h-[calc(100vh-3.5rem)] bg-slate-100 p-4 gap-4">
+<div class="flex h-[calc(100vh-3.5rem)] bg-slate-100 p-2 sm:p-4 gap-2 sm:gap-4 overflow-hidden">
 
   <!-- Sidebar -->
-  <aside class="w-56 bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+  <aside class="w-12 sm:w-16 xl:w-56 bg-white border border-slate-200 rounded-xl p-1.5 sm:p-3 xl:p-4 flex flex-col justify-between transition-all duration-300">
     <div>
-      <div class="mb-6">
+      <div class="mb-6 hidden xl:block">
         <h2 class="text-base font-bold text-slate-900">Lab Explorer</h2>
         <p class="text-xs text-slate-500">Module: {$currentModule}</p>
       </div>
+      <div class="mb-6 block xl:hidden text-center text-base sm:text-lg font-bold text-blue-600">
+        🔬
+      </div>
 
       <nav class="space-y-1 text-sm font-medium">
-        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50" on:click={() => $isModuleModalOpen = true}>
-          🧪 <span>Modules</span>
+        <button class="w-full flex items-center justify-center xl:justify-start gap-3 px-1.5 sm:px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer" on:click={() => $isModuleModalOpen = true} title="Modules">
+          🧪 <span class="hidden xl:inline">Modules</span>
         </button>
-        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-blue-600 bg-blue-50 font-semibold">
-          ⚗️ <span>Experiments</span>
+        <button class="w-full flex items-center justify-center xl:justify-start gap-3 px-1.5 sm:px-3 py-2 rounded-lg text-blue-600 bg-blue-50 font-semibold cursor-pointer" title="Experiments">
+          ⚗️ <span class="hidden xl:inline">Experiments</span>
         </button>
-        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-          💾 <span>Saved States</span>
+        <button class="w-full flex items-center justify-center xl:justify-start gap-3 px-1.5 sm:px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer" title="Saved States">
+          💾 <span class="hidden xl:inline">Saved States</span>
         </button>
-        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-          📊 <span>Data Logs</span>
+        <button class="w-full flex items-center justify-center xl:justify-start gap-3 px-1.5 sm:px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer" title="Data Logs">
+          📊 <span class="hidden xl:inline">Data Logs</span>
         </button>
-        <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50">
-          📖 <span>Resources</span>
+        <button class="w-full flex items-center justify-center xl:justify-start gap-3 px-1.5 sm:px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer" title="Resources">
+          📖 <span class="hidden xl:inline">Resources</span>
         </button>
       </nav>
     </div>
 
     <div class="space-y-3">
       <button 
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-1 sm:py-2.5 sm:px-2 xl:px-4 rounded-lg text-[10px] sm:text-xs xl:text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
         on:click={() => $isHardwareModalOpen = true}
+        title="New Experiment"
       >
-        + NEW EXPERIMENT
+        <span>+</span> <span class="hidden xl:inline">NEW EXPERIMENT</span>
       </button>
-      <div class="pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+      <div class="pt-2 border-t border-slate-100 text-xs text-slate-500 space-y-1 hidden xl:block text-left">
         <button class="block hover:underline">❓ Help</button>
         <button class="block hover:underline">📄 Docs</button>
+      </div>
+      <div class="pt-2 border-t border-slate-100 text-center text-slate-500 space-y-1 block xl:hidden">
+        <button class="block hover:underline mx-auto text-sm sm:text-base" title="Help & Docs">❓</button>
       </div>
     </div>
   </aside>
 
   <!-- Center Panel: Interactive Canvas & Parameters -->
-  <main class="flex-1 flex flex-col gap-4 overflow-hidden">
+  <main class="flex-1 flex flex-col gap-2 sm:gap-4 overflow-hidden">
     <!-- Simulation Stage -->
     <div class="relative flex-1 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
       {#if $labState.experiment === 'simple_pendulum'}
@@ -322,14 +353,14 @@ Student Question: ${studentPrompt}
     </div>
 
     <!-- Parameter Dashboard -->
-    <div class="bg-white border border-slate-200 rounded-xl p-4 flex gap-8">
+    <div class="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 flex flex-col xl:flex-row gap-4 xl:gap-8 overflow-y-auto xl:overflow-y-visible max-h-[35vh] xl:max-h-none shadow-sm">
       {#if $currentModule === 'Mechanics'}
         <!-- Mechanics (Simple Pendulum) -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-2 lg:space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Primary Parameters</h3>
           
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Length (L)</span>
               <span class="text-blue-600 font-mono">{$labState.length.toFixed(2)} m</span>
             </div>
@@ -337,7 +368,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Initial Angle (θ)</span>
               <span class="text-blue-600 font-mono">{$labState.angle}°</span>
             </div>
@@ -345,7 +376,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Mass (m)</span>
               <span class="text-blue-600 font-mono">{$labState.mass.toFixed(2)} kg</span>
             </div>
@@ -353,10 +384,10 @@ Student Question: ${studentPrompt}
           </div>
         </div>
 
-        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
+        <div class="w-full xl:w-64 space-y-2 lg:space-y-4 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Environment Settings</h3>
           <div>
-            <label for="damping-factor" class="block text-xs font-medium text-slate-600 mb-1">Damping Factor</label>
+            <label for="damping-factor" class="block text-[11px] lg:text-xs font-medium text-slate-600 mb-1">Damping Factor</label>
             <select id="damping-factor" bind:value={$labState.damping} class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium">
               <option>None</option>
               <option>Low (Air Friction)</option>
@@ -365,7 +396,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Local Gravity (g)</span>
               <span class="text-blue-600 font-mono">{$labState.gravity.toFixed(2)} m/s²</span>
             </div>
@@ -375,11 +406,11 @@ Student Question: ${studentPrompt}
 
       {:else if $currentModule === 'Optics'}
         <!-- Optics (Thin Lens) -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-2 lg:space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Optics Parameters</h3>
           
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Object Distance (d_o)</span>
               <span class="text-blue-600 font-mono">{$labState.opticsObjectDistance} cm</span>
             </div>
@@ -387,7 +418,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Focal Length (f)</span>
               <span class="text-blue-600 font-mono">{$labState.opticsFocalLength} cm</span>
             </div>
@@ -395,7 +426,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <span class="block text-xs font-semibold text-slate-600 mb-1">Lens Type</span>
+            <span class="block text-[11px] lg:text-xs font-semibold text-slate-600 mb-1">Lens Type</span>
             <div class="flex gap-2 bg-slate-50 border border-slate-200 p-0.5 rounded-lg">
               {#each ['Convex', 'Concave'] as type}
                 <button 
@@ -409,10 +440,10 @@ Student Question: ${studentPrompt}
           </div>
         </div>
 
-        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
+        <div class="w-full xl:w-64 space-y-2 lg:space-y-4 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Object Details</h3>
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Object Height (h_o)</span>
               <span class="text-blue-600 font-mono">{$labState.opticsObjectHeight} cm</span>
             </div>
@@ -451,11 +482,11 @@ Student Question: ${studentPrompt}
 
       {:else if $currentModule === 'Thermodynamics'}
         <!-- Thermodynamics (Ideal Gas) -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-2 lg:space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Gas Parameters</h3>
           
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Temperature (T)</span>
               <span class="text-blue-600 font-mono">{$labState.gasTemperature} K</span>
             </div>
@@ -463,7 +494,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Volume (V)</span>
               <span class="text-blue-600 font-mono">{$labState.gasVolume.toFixed(2)} (Relative)</span>
             </div>
@@ -471,10 +502,10 @@ Student Question: ${studentPrompt}
           </div>
         </div>
 
-        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
+        <div class="w-full xl:w-64 space-y-2 lg:space-y-4 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Gas Composition</h3>
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Particle Count (N)</span>
               <span class="text-blue-600 font-mono">{$labState.gasParticles}</span>
             </div>
@@ -489,11 +520,11 @@ Student Question: ${studentPrompt}
 
       {:else if $currentModule === 'Electromagnetism'}
         <!-- Electromagnetism (Solenoid) -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-2 lg:space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Coil Parameters</h3>
           
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Coil Turns (N)</span>
               <span class="text-blue-600 font-mono">{$labState.solenoidTurns} turns</span>
             </div>
@@ -501,7 +532,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Electric Current (I)</span>
               <span class="text-blue-600 font-mono">{$labState.solenoidCurrent.toFixed(1)} A</span>
             </div>
@@ -509,10 +540,10 @@ Student Question: ${studentPrompt}
           </div>
         </div>
 
-        <div class="w-64 space-y-4 border-l border-slate-100 pl-8">
+        <div class="w-full xl:w-64 space-y-2 lg:space-y-4 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Magnetic Core</h3>
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span>Relative Permeability (μ_r)</span>
               <span class="text-blue-600 font-mono">{$labState.solenoidPermeability}</span>
             </div>
@@ -529,11 +560,11 @@ Student Question: ${studentPrompt}
       {:else if $currentModule === 'Chemistry'}
         <!-- Chemistry (Titration) -->
         <!-- Col 1: Titration Parameters -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-2 lg:space-y-4">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Titration Parameters</h3>
           
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span class="text-slate-700">Titrant Concentration (M₁)</span>
               <span class="text-blue-600 font-mono">{$titrationState.titrantConc.toFixed(2)} M</span>
             </div>
@@ -541,7 +572,7 @@ Student Question: ${studentPrompt}
           </div>
 
           <div>
-            <div class="flex justify-between text-xs font-medium mb-1">
+            <div class="flex justify-between text-[11px] lg:text-xs font-medium mb-1">
               <span class="text-slate-700">Analyte Volume (V₂)</span>
               <span class="text-blue-600 font-mono">{$titrationState.analyteVolume.toFixed(1)} mL</span>
             </div>
@@ -550,7 +581,7 @@ Student Question: ${studentPrompt}
         </div>
 
         <!-- Col 2: Simulation Controls -->
-        <div class="flex-1 border-l border-slate-100 pl-8 space-y-3">
+        <div class="flex-1 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8 space-y-2 lg:space-y-3">
           <div class="flex justify-between items-center">
             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Simulation Controls</h3>
             <div class="flex items-center gap-1">
@@ -648,7 +679,7 @@ Student Question: ${studentPrompt}
         </div>
 
         <!-- Col 3: Chemical Settings & Indicator Spectrum -->
-        <div class="w-80 border-l border-slate-100 pl-8 space-y-2">
+        <div class="w-full xl:w-80 border-t xl:border-t-0 xl:border-l border-slate-100 pt-4 xl:pt-0 pl-0 xl:pl-8 space-y-1.5 lg:space-y-2">
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Chemical Settings</h3>
           
           <div class="flex gap-4">
@@ -701,147 +732,151 @@ Student Question: ${studentPrompt}
     </div>
   </main>
 
+{#if isChatOpen}
   <!-- Right Panel: Nexa AI Tutor -->
-  <aside class="w-96 bg-white border border-slate-200 rounded-xl flex flex-col justify-between overflow-hidden">
-    <div class="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-      <div class="flex items-center gap-2.5">
-        <img src="/nexus.png" alt="Nexa Lab Logo" class="w-7 h-7 object-contain rounded-lg" />
-        <div>
-          <h3 class="text-xs font-bold text-slate-900">Nexa STEM Tutor</h3>
-          <p class="text-[10px] text-blue-600 font-mono">● {isGenerating ? 'GENERATING...' : 'ONLINE'}</p>
-        </div>
-      </div>
-      <button class="text-slate-400 hover:text-slate-600">⋮</button>
-    </div>
-
-    <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex gap-2">
-      <button 
-        class="flex-1 py-1.5 px-3 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all"
-        on:click={() => sendPrompt(`Start the ${$currentModule} virtual lab experiment. Please explain the objectives of the experiment, explain the physics theories and equations involved, and guide me on what parameters I can adjust and what physical effects I should observe.`)}
-      >
-        🚀 Start Experiment
-      </button>
-      <button 
-        class="flex-1 py-1.5 px-3 rounded-lg text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all"
-        on:click={() => sendPrompt(`Help me write a professional and structured laboratory report for the ${$currentModule} experiment based on the current active parameters. Please include:
-1. Title
-2. Objectives
-3. Background & Theoretical Physics Principles (including LaTeX equations)
-4. Experimental Setup & Simulation parameters
-5. Observations & Data Analysis (using my active numbers)
-6. Calculations & Discussion
-7. Summary & Conclusion`)}
-      >
-        📝 Write Lab Report
-      </button>
-    </div>
-
-    <!-- Chat Messages Stream with KaTeX Integration -->
-    <div class="flex-1 p-4 overflow-y-auto space-y-3">
-      {#each $chatMessages as msg}
-        <div class="flex flex-col {msg.sender === 'user' ? 'items-end' : 'items-start'}">
-          <div class="max-w-[85%] rounded-xl p-3 text-xs leading-relaxed {msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'}">
-            {#if msg.sender === 'user'}
-              {msg.text}
-            {:else}
-              <KaTeX text={msg.text} />
-            {/if}
+  <aside class="w-72 lg:w-80 xl:w-96 bg-white border border-slate-200 rounded-xl flex flex-col justify-between overflow-hidden transition-all duration-300">
+      <div class="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2.5">
+          <img src="/nexus.png" alt="Nexa Lab Logo" class="w-7 h-7 object-contain rounded-lg" />
+          <div>
+            <h3 class="text-xs font-bold text-slate-900">Nexa STEM Tutor</h3>
+            <p class="text-[10px] text-blue-600 font-mono">● {isGenerating ? 'GENERATING...' : 'ONLINE'}</p>
           </div>
-          <span class="text-[9px] text-slate-400 mt-1">{msg.time}</span>
         </div>
-      {/each}
-    </div>
-
-    <!-- Action Pills & Input Bar -->
-    <div class="p-3 border-t border-slate-200 bg-slate-50 space-y-2">
-      <div class="flex gap-1.5 flex-wrap">
-        {#if $currentModule === 'Mechanics'}
-          <button 
-            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Derive the simple pendulum period formula step-by-step.")}
-          >
-            DERIVE FORMULA STEP-BY-STEP
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Explain why angle size affects the pendulum approximation.")}
-          >
-            EXPLAIN IN SIMPLER TERMS
-          </button>
-        {:else if $currentModule === 'Optics'}
-          <button 
-            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Derive the lens maker and thin lens equation step-by-step.")}
-          >
-            DERIVE FORMULA STEP-BY-STEP
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Explain the difference between real and virtual images.")}
-          >
-            EXPLAIN IN SIMPLER TERMS
-          </button>
-        {:else if $currentModule === 'Thermodynamics'}
-          <button 
-            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Derive the kinetic theory formula for gas pressure step-by-step.")}
-          >
-            DERIVE FORMULA STEP-BY-STEP
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Explain the relationship between temperature and molecular speed.")}
-          >
-            EXPLAIN IN SIMPLER TERMS
-          </button>
-        {:else if $currentModule === 'Electromagnetism'}
-          <button 
-            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Derive the formula for magnetic field inside a solenoid step-by-step.")}
-          >
-            DERIVE FORMULA STEP-BY-STEP
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Explain how current direction and permeability affect polarity.")}
-          >
-            EXPLAIN IN SIMPLER TERMS
-          </button>
-        {:else if $currentModule === 'Chemistry'}
-          <button 
-            class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Explain the equivalence point buffer equation")}
-          >
-            Explain the equivalence point buffer equation
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Derive $pH = -\\log_{10}[H^+]$ for this step")}
-          >
-            Derive $pH = -\log_{10}[H^+]$ for this step
-          </button>
-          <button 
-            class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
-            on:click={() => sendPrompt("Why did the phenolphthalein color disappear?")}
-          >
-            Why did the phenolphthalein color disappear?
-          </button>
-        {/if}
+        <button class="text-slate-400 hover:text-slate-600">⋮</button>
       </div>
 
-      <form class="flex items-center gap-2" on:submit|preventDefault={() => sendPrompt()}>
-        <input 
-          type="text" 
-          placeholder="Ask Nexa about {$currentModule.toLowerCase()}..." 
-          bind:value={userInput}
-          class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
-        />
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-all text-xs">
-          ➤
+      <div class="px-4 py-2 border-b border-slate-200 bg-slate-50 flex gap-2">
+        <button 
+          class="flex-1 py-1.5 px-3 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all"
+          on:click={() => sendPrompt(`Start the ${$currentModule} virtual lab experiment. Please explain the objectives of the experiment, explain the physics theories and equations involved, and guide me on what parameters I can adjust and what physical effects I should observe.`)}
+        >
+          🚀 Start Experiment
         </button>
-      </form>
-    </div>
-  </aside>
+        <button 
+          class="flex-1 py-1.5 px-3 rounded-lg text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all"
+          on:click={() => sendPrompt(`Help me write a professional and structured laboratory report for the ${$currentModule} experiment based on the current active parameters. Please include:
+  1. Title
+  2. Objectives
+  3. Background & Theoretical Physics Principles (including LaTeX equations)
+  4. Experimental Setup & Simulation parameters
+  5. Observations & Data Analysis (using my active numbers)
+  6. Calculations & Discussion
+  7. Summary & Conclusion`)}
+        >
+          📝 Write Lab Report
+        </button>
+      </div>
+
+      <!-- Chat Messages Stream with KaTeX Integration -->
+      <div class="flex-1 p-4 overflow-y-auto space-y-3">
+        {#each $chatMessages as msg}
+          <div class="flex flex-col {msg.sender === 'user' ? 'items-end' : 'items-start'}">
+            <div class="max-w-[85%] rounded-xl p-3 text-xs leading-relaxed {msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'}">
+              {#if msg.sender === 'user'}
+                {msg.text}
+              {:else}
+                <KaTeX text={msg.text} />
+              {/if}
+            </div>
+            <span class="text-[9px] text-slate-400 mt-1">{msg.time}</span>
+          </div>
+        {/each}
+      </div>
+
+      <!-- Action Pills & Input Bar -->
+      <div class="p-3 border-t border-slate-200 bg-slate-50 space-y-2">
+        <div class="flex gap-1.5 flex-wrap">
+          {#if $currentModule === 'Mechanics'}
+            <button 
+              class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+              on:click={() => sendPrompt("Derive the simple pendulum period formula step-by-step.")}
+            >
+              DERIVE FORMULA STEP-BY-STEP
+            </button>
+            <button 
+              class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+              on:click={() => sendPrompt("Explain why angle size affects the pendulum approximation.")}
+            >
+              EXPLAIN IN SIMPLER TERMS
+            </button>
+          {:else}
+            {#if $currentModule === 'Optics'}
+              <button 
+                class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Derive the lens maker and thin lens equation step-by-step.")}
+              >
+                DERIVE FORMULA STEP-BY-STEP
+              </button>
+              <button 
+                class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Explain the difference between real and virtual images.")}
+              >
+                EXPLAIN IN SIMPLER TERMS
+              </button>
+            {:else if $currentModule === 'Thermodynamics'}
+              <button 
+                class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Derive the kinetic theory formula for gas pressure step-by-step.")}
+              >
+                DERIVE FORMULA STEP-BY-STEP
+              </button>
+              <button 
+                class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Explain the relationship between temperature and molecular speed.")}
+              >
+                EXPLAIN IN SIMPLER TERMS
+              </button>
+            {:else if $currentModule === 'Electromagnetism'}
+              <button 
+                class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Derive the formula for magnetic field inside a solenoid step-by-step.")}
+              >
+                DERIVE FORMULA STEP-BY-STEP
+              </button>
+              <button 
+                class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Explain how current direction and permeability affect polarity.")}
+              >
+                EXPLAIN IN SIMPLER TERMS
+              </button>
+            {:else if $currentModule === 'Chemistry'}
+              <button 
+                class="text-[10px] font-semibold bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Explain the equivalence point buffer equation")}
+              >
+                Explain the equivalence point buffer equation
+              </button>
+              <button 
+                class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Derive $pH = -\\log_{10}[H^+]$ for this step")}
+              >
+                Derive $pH = -\log_{10}[H^+]$ for this step
+              </button>
+              <button 
+                class="text-[10px] font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-full transition-all"
+                on:click={() => sendPrompt("Why did the phenolphthalein color disappear?")}
+              >
+                Why did the phenolphthalein color disappear?
+              </button>
+            {/if}
+          {/if}
+        </div>
+
+        <form class="flex items-center gap-2" on:submit|preventDefault={() => sendPrompt()}>
+          <input 
+            type="text" 
+            placeholder="Ask Nexa about {$currentModule.toLowerCase()}..." 
+            bind:value={userInput}
+            class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+          />
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-all text-xs">
+            ➤
+          </button>
+        </form>
+      </div>
+    </aside>
+  {/if}
 </div>
 
 <!-- Modals -->

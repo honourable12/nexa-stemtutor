@@ -26,17 +26,17 @@
     </div>
 
     <!-- Wizard Steps Stepper -->
-    <div class="px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-500">
+    <div class="px-4 sm:px-8 py-3 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold text-slate-500 gap-2 sm:gap-0">
       <div class="flex items-center gap-2 text-blue-600">
         <span class="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
         PHYSICAL ASSEMBLY
       </div>
-      <div class="h-px bg-slate-200 w-12"></div>
+      <div class="hidden sm:block h-px bg-slate-200 w-8 md:w-12"></div>
       <div class="flex items-center gap-2 text-slate-400">
         <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px]">2</span>
         SENSOR CALIBRATION
       </div>
-      <div class="h-px bg-slate-200 w-12"></div>
+      <div class="hidden sm:block h-px bg-slate-200 w-8 md:w-12"></div>
       <div class="flex items-center gap-2 text-slate-400">
         <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px]">3</span>
         SYSTEM TEST
@@ -44,7 +44,7 @@
     </div>
 
     <!-- Body Layout -->
-    <div class="p-6 grid grid-cols-2 gap-6 items-center">
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
       <!-- Diagram Blueprint Frame -->
       <div class="bg-slate-900 rounded-xl p-6 h-64 border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden">
         <div class="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>

@@ -1102,7 +1102,7 @@
 
 <div class="flex flex-col lg:flex-row h-full w-full bg-slate-950 text-slate-100 overflow-hidden font-sans select-none">
   <!-- Left Column: Chemistry Lab Apparatus -->
-  <div class="relative w-full lg:w-[280px] xl:w-[320px] h-[350px] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 flex flex-col bg-slate-900/10">
+  <div class="relative w-full lg:w-[280px] xl:w-[320px] h-[200px] sm:h-[280px] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 flex flex-col bg-slate-900/10">
 
     
     <div class="flex-1 w-full relative min-h-0">
@@ -1118,7 +1118,7 @@
   <!-- Right Column: Analytical Dashboard -->
   <div class="flex-1 h-full flex flex-col min-w-0 bg-slate-950/20">
     <!-- Graph Panel -->
-    <div class="flex-1 relative min-h-[220px] p-4 pb-0">
+    <div class="flex-1 relative min-h-[140px] sm:min-h-[180px] lg:min-h-[220px] p-4 pb-0">
       <canvas 
         bind:this={graphCanvas} 
         on:mousemove={handleGraphMouseMove}

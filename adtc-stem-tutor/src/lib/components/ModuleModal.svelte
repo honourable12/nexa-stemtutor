@@ -64,7 +64,7 @@
     </div>
 
     <!-- Cards Grid -->
-    <div class="p-6 grid grid-cols-5 gap-3">
+    <div class="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
       {#each modules as m}
         <button 
           class="flex flex-col items-center p-4 rounded-xl border text-center transition-all relative {selected === m.id ? 'border-blue-600 bg-blue-50/50 shadow-sm ring-2 ring-blue-600/20' : 'border-slate-200 hover:border-slate-300'}"
