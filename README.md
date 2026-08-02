@@ -40,9 +40,29 @@ To compile and run this application locally, your development machine needs:
 1.  **Rust Toolchain:** Install Rust via [rustup](https://rustup.rs/).
 2.  **C/C++ Build Tools:**
     *   **Windows:** [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with C++ desktop development tools installed, including `MSVC` and `CMake`.
-    *   **macOS / Linux:** `cmake` and `clang` / `build-essential`.
+    *   **Linux (Ubuntu/Fedora/etc.):** `cmake`, C/C++ compiler (`gcc`/`g++` or `clang`), and Tauri system dependencies.
 3.  **Node.js:** Node.js v18+ and `npm`.
-4.  **Tauri Prerequisites:** Follow the [Tauri v2 Setup Guide](https://v2.tauri.app/start/prerequisites/) for your operating system.
+
+### Linux System Prerequisites
+For Linux distributions, Tauri v2 and the `llama.cpp` compiler require several system libraries (Webkit2GTK, GTK3, OpenSSL, CMake, etc.).
+
+A convenience setup script `setup_linux.sh` is provided in the root directory. You can run it to automatically detect your distribution (Ubuntu/Debian-based or Fedora/RHEL-based) and install all required system packages:
+```bash
+# From the root folder:
+bash setup_linux.sh
+```
+
+Alternatively, you can install them manually:
+*   **Ubuntu/Debian/Mint/Pop!_OS:**
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y build-essential curl wget pkg-config libssl-dev libgtk-3-dev webkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev cmake
+    ```
+*   **Fedora/Nobara:**
+    ```bash
+    sudo dnf groupinstall "Development Tools"
+    sudo dnf install -y curl wget pkgconf-pkg-config openssl-devel gtk3-devel webkit2gtk4.1-devel libsoup3-devel libayatana-appindicator-devel librsvg2-devel cmake
+    ```
 
 ---
 
