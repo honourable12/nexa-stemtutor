@@ -90,11 +90,11 @@ pub fn execute_tool(name: &str, args: &Value) -> Value {
             let total_v = (v_a + v_b) / 1000.0;
 
             let ph = if moles_b > moles_a {
-                14.0 - (-Math_log10((moles_b - moles_a) / total_v))
+                14.0 - (-math_log10((moles_b - moles_a) / total_v))
             } else if (moles_a - moles_b).abs() < 1e-7 {
                 7.0
             } else {
-                -Math_log10((moles_a - moles_b) / total_v)
+                -math_log10((moles_a - moles_b) / total_v)
             };
             json!({ "ph": ph })
         }
@@ -102,6 +102,6 @@ pub fn execute_tool(name: &str, args: &Value) -> Value {
     }
 }
 
-fn Math_log10(val: f64) -> f64 {
+fn math_log10(val: f64) -> f64 {
     val.log10()
 }

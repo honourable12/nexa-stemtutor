@@ -26,3 +26,4 @@ results-folder/
 do.txt
 adtc-stem-tutor/src-tauri/icons/ios/
 adtc-stem-tutor/src-tauri/icons/android/
+model/embeddings.bin
