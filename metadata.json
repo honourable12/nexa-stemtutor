@@ -27,7 +27,7 @@
   "model": {
     "name": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
     "runtime": "llama.cpp",
-    "quantization": "GGUF Q4_K_XL",
+    "quantization": "GGUF Q4_K_M",
     "parameters_estimate": "~1.5B",
     "packaging": "binary_bundle"
   },
