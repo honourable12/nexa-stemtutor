@@ -1,15 +1,16 @@
 {
-  "name": "adtc-stem-tutor",
+  "name": "nexa-stem-tutor",
   "version": "0.1.0",
   "description": "",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
+    "dev": "vite",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:check": "tauri info",
+    "tauri:icon": "tauri icon src-tauri/icons/app-icon.png",
+    "pretauri:build": "node scripts/check-icons.js"
   },
   "license": "MIT",
   "dependencies": {

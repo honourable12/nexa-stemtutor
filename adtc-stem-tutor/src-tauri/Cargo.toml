@@ -1,5 +1,5 @@
 [package]
-name = "adtc-stem-tutor"
+name = "nexa-stem-tutor"
 version = "0.1.0"
 description = "Localized STEM Virtual Lab Tutor Desktop Boilerplate"
 authors = ["honourable12"]
@@ -28,10 +28,12 @@ llama-cpp-2 = "0.1.150"
 num_cpus = "1.16"
 
 [profile.release]
-opt-level = 3
-lto = "fat"
-codegen-units = 1
+opt-level = "s"
+lto = false
+codegen-units = 16
 strip = true
+panic ="abort"
+incremental = false
 
 [profile.dev.package."*"]
 opt-level = 3

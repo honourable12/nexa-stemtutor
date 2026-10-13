@@ -1,7 +1,7 @@
 {
-  "productName": "Localized STEM Tutor",
+  "productName": "NEXA STEM Tutor",
   "version": "1.0.0",
-  "identifier": "com.adtc.stemtutor",
+  "identifier": "com.nexa.stemtutor",
   "build": {
       "beforeDevCommand": "npm run dev",
       "beforeBuildCommand": "npm run build",
@@ -24,11 +24,26 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
+      "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": [],
+    "publisher": "ADTC",
+    "copyright": "© 2026 AXE. All rights reserved.",
+    "category": "Education",
+    "shortDescription": "STEM Tutor",
+    "longDescription": "NEXA STEM Tutor - interactive learning application for STEM education.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
   }
 }
