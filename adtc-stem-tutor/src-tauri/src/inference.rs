@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::context::LlamaContext;
@@ -17,6 +17,111 @@ pub static GEN_LOCK: Mutex<()> = Mutex::new(());
 pub struct TokenPayload {
     pub token: String,
 }
+
+// v0.2 Feature 2: Configurable sampling
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SamplingConfig {
+    pub temperature: f32,
+    pub top_p: f32,
+    pub repeat_penalty: f32,
+    pub max_tokens: u32,
+}
+
+impl Default for SamplingConfig {
+    fn default() -> Self {
+        Self {
+            temperature: 0.7,
+            top_p: 0.9,
+            repeat_penalty: 1.1,
+            max_tokens: 768,
+        }
+    }
+}
+
+impl SamplingConfig {
+    pub fn is_math_mode(sys_content: &str, user_content: &str) -> bool {
+        const TRIGGERS: &[&str] = &[
+            "derive", "calculate", "solve", "equation", "prove",
+            "derivation", "formula for", "compute",
+        ];
+        let sys_lower = sys_content.to_lowercase();
+        let user_lower = user_content.to_lowercase();
+        TRIGGERS.iter().any(|t| sys_lower.contains(t) || user_lower.contains(t))
+    }
+
+    /// v0.2.0 ships with a conservative 2-step chain (dist + greedy) to
+    /// avoid API drift across llama-cpp-2 point releases. The `top_p`
+    /// and `repeat_penalty` fields stay in the struct for forward
+    /// compatibility;
+    pub fn build_sampler(&self, math_mode: bool) -> LlamaSampler {
+        if math_mode || self.temperature <= 0.0 {
+            return LlamaSampler::chain_simple([LlamaSampler::greedy()]);
+        }
+        // Sampled chain: Distrib -> Greedy.
+        LlamaSampler::chain_simple([
+            LlamaSampler::dist(self.temperature),
+            LlamaSampler::greedy(),
+        ])
+    }
+}
+
+// v0.2: Conversation memory — history injection helpers
+// 
+
+fn render_history_turn(role: &str, text: &str) -> String {
+    format!("<|im_start|>{}\n{}\n<|im_end|>\n", role, text)
+}
+
+/// Build the history block to inject between the system block and the
+/// latest user block. Walks newest-first, accumulating token count, and
+/// stops when the budget is exhausted. Returns the rendered block as a
+/// single String and the number of turns actually included.
+pub fn build_history_block(
+    model: &LlamaModel,
+    history: &[(String, String)],
+    prompt_token_budget: u32,
+) -> (String, usize) {
+    if history.is_empty() {
+        return (String::new(), 0);
+    }
+    // Reserve 512 tokens for the assistant's response; the rest is the
+    // ceiling for injected history.
+    let history_budget = N_CTX
+        .saturating_sub(prompt_token_budget)
+        .saturating_sub(512);
+    if history_budget == 0 {
+        return (String::new(), 0);
+    }
+
+    let mut rendered = String::new();
+    let mut total_tokens: u32 = 0;
+    let mut included = 0;
+
+    // Walk newest-first (most recent context is most valuable)
+    for (role, text) in history.iter().rev() {
+        let turn = render_history_turn(role, text);
+        let turn_tokens = model.str_to_token(&turn, AddBos::Never)
+            .map(|t| t.len() as u32)
+            .unwrap_or(0);
+        if turn_tokens == 0 {
+            continue;
+        }
+        if total_tokens.saturating_add(turn_tokens) > history_budget {
+            break;
+        }
+        // Prepend so the final order is oldest-first when we inject
+        rendered = turn + &rendered;
+        total_tokens += turn_tokens;
+        included += 1;
+        if included >= 8 {
+            break; // client-side cap, redundant safety here
+        }
+    }
+    (rendered, included)
+}
+
+// Existing helpers
 
 pub fn parse_chatml_prompt(prompt: &str) -> (String, String) {
     let sys_start = "<|im_start|>system\n";
@@ -96,6 +201,10 @@ pub fn prefill_tokens(
     Ok(())
 }
 
+/// v0.2: run_inference_loop now accepts a pre-built sampler and a
+/// max_tokens cap. The sampler is built by SamplingConfig::build_sampler
+/// upstream so the math-mode decision can happen once per inference call,
+/// not once per loop iteration.
 pub fn run_inference_loop(
     model: &LlamaModel,
     ctx: &mut LlamaContext,
@@ -105,18 +214,22 @@ pub fn run_inference_loop(
     n_cur: &mut i32,
     stream_to_ui: bool,
     check_prefix: bool,
+    sampler: LlamaSampler,
+    max_tokens: u32,
 ) -> Result<(String, bool), String> {
-    let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::greedy(),
-    ]);
-
     let mut utf8_buffer: Vec<u8> = Vec::new();
     let mut generated_text = String::new();
     let mut prefix_buffer = String::new();
     let mut checking_prefix = check_prefix;
     let mut is_tool_call = false;
+    let mut tokens_emitted: u32 = 0;
 
     while *n_cur < N_CTX as i32 {
+        // v0.2: max-tokens cap
+        if tokens_emitted >= max_tokens {
+            break;
+        }
+
         let batch_idx = (batch.n_tokens() - 1) as i32;
         let token = sampler.sample(ctx, batch_idx);
 
@@ -151,7 +264,7 @@ pub fn run_inference_loop(
 
         if !decoded_piece.is_empty() {
             generated_text.push_str(&decoded_piece);
-            
+
             if checking_prefix {
                 prefix_buffer.push_str(&decoded_piece);
                 if prefix_buffer.len() >= 11 {
@@ -191,6 +304,7 @@ pub fn run_inference_loop(
             .map_err(|e| format!("Token decoding failure: {:?}", e))?;
 
         *n_cur += 1;
+        tokens_emitted += 1;
     }
 
     if !utf8_buffer.is_empty() {
@@ -212,10 +326,15 @@ pub fn run_inference_loop(
     Ok((generated_text, is_tool_call))
 }
 
+// v0.2: the Tauri command now accepts history, sampling config, and language.
+
 #[tauri::command]
 pub async fn stream_stem_tutor_inference(
     app: AppHandle,
     student_prompt: String,
+    history: Vec<(String, String)>,
+    sampling_config: SamplingConfig,
+    current_language: String,
 ) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let _guard = GEN_LOCK.lock().unwrap();
@@ -231,45 +350,70 @@ pub async fn stream_stem_tutor_inference(
         let active_state = parse_state_from_sys_prompt(&sys_content);
         eprintln!("Info: Parsed Active State: {}", active_state);
 
-        // 2. Perform grounding RAG (retrieve context)
+        // 2. Perform grounding RAG (retrieve context, language-filtered)
         let query_emb = get_embedding(model, backend, &user_content)
             .map_err(|e| {
                 let err = format!("Failed to generate query embedding: {}", e);
                 eprintln!("Error: {}", err);
                 err
             })?;
-            
-        let curriculum = get_curriculum(model, backend);
-        let retrieved_snippets = retrieve_top_k(&query_emb, curriculum, 2);
-        eprintln!("Info: Retrieved grounding snippets");
 
-        // 3. Build prompt with tools, active simulation state, and retrieved snippets
-        let language_instruction = if sys_content.contains("en français") || sys_content.contains("Vous êtes") {
-            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Répondez directement et uniquement en français. Pas de blocs de pensée ou de balises <think>. Détaillez clairement les dérivations mathématiques étape par étape."
-        } else if sys_content.contains("Kiswahili") || sys_content.contains("Wewe ni Mwalimu") {
-            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Jibu moja kwa moja na kwa Kiswahili pekee. Usitoe mawazo au lebo za <think>. Eleza hatua kwa hatua makadirio yote ya hesabu."
+        let curriculum = get_curriculum(model, backend);
+        let retrieved_snippets = retrieve_top_k(&query_emb, curriculum, 2, &current_language);
+        eprintln!("Info: Retrieved grounding snippets (lang={})", current_language);
+
+        // 3. Build prompt with tools, active simulation state, retrieved snippets,
+        //    and v0.2 conversation history.
+        let language_instruction = if sys_content.contains("en français") || sys_content.contains("Vous êtes") || current_language == "fr" {
+            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Répondez directement et uniquement en français. Pas de blocs de pensée ou de balises _BLK. Détaillez clairement les dérivations mathématiques étape par étape."
+        } else if sys_content.contains("Kiswahili") || sys_content.contains("Wewe ni Mwalimu") || current_language == "sw" {
+            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Jibu moja kwa moja na kwa Kiswahili pekee. Usitoe mawazo au lebo za _BLK. Eleza hatua kwa hatua makadirio yote ya hesabu."
         } else {
-            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Direct answer only in English. Do not output thinking blocks or <think> tags. Detail mathematical derivations step-by-step cleanly."
+            "You are Nexa, a Localized Interactive STEM Virtual Lab Tutor. Direct answer only in English. Do not output thinking blocks or _BLK tags. Detail mathematical derivations step-by-step cleanly."
         };
-        
+
         let snippet_1 = retrieved_snippets.get(0).cloned().unwrap_or_default();
         let snippet_2 = retrieved_snippets.get(1).cloned().unwrap_or_default();
-        
-        let first_pass_prompt = format!(
-            "<|im_start|>system\n{}\n[Active Simulation State: {}]\n\n# Tools\nWhen a numeric computation or exact calculation is requested, invoke a function instead of guessing.\n<tools>\n{}\n</tools>\n\nTo call a function, respond strictly in this format:\n<tool_call>{{\"name\": \"...\", \"arguments\": {{...}}}}</tool_call>\n\n# Grounding Reference Material\n- {}\n- {}\n<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
+
+        // v0.2: build history block, budgeted against the prompt size.
+        let base_prompt_head = format!(
+            "<|im_start|>system\n{}\n[Active Simulation State: {}]\n\n# Tools\nWhen a numeric computation or exact calculation is requested, invoke a function instead of guessing.\n<tools>\n{}\n</tools>\n\nTo call a function, respond strictly in this format:\n<tool_call>{{\"name\": \"...\", \"arguments\": {{...}}}}</tool_call>\n\n# Grounding Reference Material\n- {}\n- {}\n<|im_end|>\n",
             language_instruction,
             active_state,
             crate::tools::TOOL_DEFINITIONS,
             snippet_1,
             snippet_2,
+        );
+        let base_prompt_tail = format!(
+            "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
             user_content
         );
+
+        // Tokenize head+tail to compute the budget available for history.
+        let head_tokens = model.str_to_token(&base_prompt_head, AddBos::Always)
+            .map(|t| t.len() as u32)
+            .unwrap_or(0);
+        let tail_tokens = model.str_to_token(&base_prompt_tail, AddBos::Never)
+            .map(|t| t.len() as u32)
+            .unwrap_or(0);
+        let prompt_token_budget = head_tokens.saturating_add(tail_tokens);
+
+        let (history_block, n_included) = build_history_block(
+            model,
+            &history,
+            prompt_token_budget,
+        );
+        if n_included > 0 {
+            eprintln!("Info: Injected {} history turns (budgeted against {} reserved tokens)", n_included, prompt_token_budget);
+        }
+
+        let first_pass_prompt = format!("{}{}{}", base_prompt_head, history_block, base_prompt_tail);
 
         // 4. Set up context and decode prompt
         let ctx_params = build_context_params();
         let mut ctx = model.new_context(backend, ctx_params)
             .map_err(|e| format!("Context pool allocation failed: {:?}", e))?;
-            
+
         let tokens = model.str_to_token(&first_pass_prompt, AddBos::Always)
             .map_err(|e| format!("Tokenization engine fault: {:?}", e))?;
 
@@ -283,6 +427,16 @@ pub async fn stream_stem_tutor_inference(
         let mut n_cur = tokens.len() as i32;
         let mut is_generating = true;
 
+        // v0.2: math-mode auto-detection + sampler construction
+        let math_mode = SamplingConfig::is_math_mode(&sys_content, &user_content);
+        let sampler = sampling_config.build_sampler(math_mode);
+        if math_mode {
+            eprintln!("Info: Math mode detected — using greedy sampler for deterministic output");
+        } else {
+            eprintln!("Info: Using sampled chain (T={}, top_p={}, penalty={})",
+                sampling_config.temperature, sampling_config.top_p, sampling_config.repeat_penalty);
+        }
+
         // 5. First pass inference
         let (first_pass_result, is_tool_call) = run_inference_loop(
             model,
@@ -293,6 +447,8 @@ pub async fn stream_stem_tutor_inference(
             &mut n_cur,
             true, // stream to UI (if it's not a tool call, this will stream it)
             true, // check prefix for <tool_call>
+            sampler,
+            sampling_config.max_tokens,
         )?;
 
         // 6. Handle tool call if detected
@@ -333,6 +489,11 @@ pub async fn stream_stem_tutor_inference(
 
                         let mut second_n_cur = second_pass_tokens.len() as i32;
 
+                        // v0.2: second pass uses the same sampler chain (math
+                        // mode applies because this is the final answer pass
+                        // and may contain derivation steps).
+                        let second_sampler = sampling_config.build_sampler(math_mode);
+
                         // Second pass: stream directly to UI (no prefix check needed)
                         run_inference_loop(
                             model,
@@ -343,6 +504,8 @@ pub async fn stream_stem_tutor_inference(
                             &mut second_n_cur,
                             true, // stream to UI
                             false, // do not check prefix (this is the final response)
+                            second_sampler,
+                            sampling_config.max_tokens,
                         )?;
                     }
                 }

@@ -1,6 +1,6 @@
 {
   "productName": "NEXA STEM Tutor",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "identifier": "com.nexa.stemtutor",
   "build": {
       "beforeDevCommand": "npm run dev",

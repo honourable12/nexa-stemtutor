@@ -3,6 +3,14 @@ import { writable, derived } from 'svelte/store';
 export const currentModule = writable('Mechanics'); // Mechanics, Optics, Thermodynamics, Electromagnetism, Chemistry
 export const currentLanguage = writable('EN'); // EN, FR, SW
 
+// Sampling configuration. Persisted to localStorage by SettingsModal.
+export const samplingConfig = writable({
+  temperature: 0.7,
+  top_p: 0.9,
+  repeat_penalty: 1.1,
+  max_tokens: 768
+});
+
 export const labState = writable({
   experiment: 'simple_pendulum', // simple_pendulum, solenoid, ideal_gas, optics_lens, titration
   length: 1.00, // meters
@@ -11,7 +19,7 @@ export const labState = writable({
   gravity: 9.81, // m/s^2
   mass: 1.00, // kg
   period: 2.01, // seconds
-  
+
   // Solenoid Electromagnetism parameters
   solenoidTurns: 20,
   solenoidCurrent: 2.0, // Amperes
@@ -53,11 +61,11 @@ export const currentPH = derived(titrationState, ($state) => {
   const cAcid = $state.analyteConc;
   const cBase = $state.titrantConc;
   const vAdded = $state.addedVolume;
-  
+
   const molesAcid = cAcid * (vAcid / 1000);
   const molesBase = cBase * (vAdded / 1000);
   const totalVolL = (vAcid + vAdded) / 1000;
-  
+
   if (molesBase < molesAcid) {
     // Before equivalence point (excess acid)
     const excessAcidMoles = molesAcid - molesBase;
