@@ -1,6 +1,6 @@
 [package]
 name = "nexa-stem-tutor"
-version = "0.1.0"
+version = "0.2.0"
 description = "Localized STEM Virtual Lab Tutor Desktop Boilerplate"
 authors = ["honourable12"]
 edition = "2021"

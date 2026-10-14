@@ -17,6 +17,8 @@
   import KaTeX from '$lib/components/KaTeX.svelte';
   import ModuleModal from '$lib/components/ModuleModal.svelte';
   import HardwareModal from '$lib/components/HardwareModal.svelte';
+  import SettingsModal from '$lib/components/SettingsModal.svelte';
+  import { samplingConfig } from '$lib/stores/labStore';
 
   // Import simulations
   import PendulumSim from '$lib/components/simulations/PendulumSim.svelte';
@@ -33,6 +35,7 @@
   let isFlowing = false;
   let flowRate = 1.0;
   let isChatOpen = true;
+  let settingsModalInstance: SettingsModal | undefined;
 
   let windowWidth = 1280;
   let windowHeight = 800;
@@ -210,7 +213,18 @@ Student Question: ${studentPrompt}
     const formattedPrompt = `<|im_start|>system\n${sysPromptLang}<|im_end|>\n<|im_start|>user\n${userText}<|im_end|>\n<|im_start|>assistant\n`;
 
     try {
-      await invoke('stream_stem_tutor_inference', { studentPrompt: formattedPrompt });
+      //serialize last 8 chat turns as (role, text) pairs.
+      const recentTurns = $chatMessages
+        .filter((m, i) => i >= $chatMessages.length - 8)
+        .map(m => [m.sender === 'nexa' ? 'assistant' : 'user', m.text])
+        .filter(([r, t]) => r && t);
+
+      await invoke('stream_stem_tutor_inference', {
+        studentPrompt: formattedPrompt,
+        history: recentTurns,
+        samplingConfig: $samplingConfig,
+        currentLanguage: $currentLanguage.toLowerCase()
+      });
       isGenerating = false;
     } catch (err) {
       console.error("Inference Error:", err);
@@ -882,3 +896,21 @@ Student Question: ${studentPrompt}
 <!-- Modals -->
 <ModuleModal />
 <HardwareModal />
+<!-- Settings button + modal -->
+<button class="settings-btn" on:click={() => settingsModalInstance?.open()}>
+  Settings
+</button>
+<SettingsModal bind:this={settingsModalInstance} />
+<style>
+  .settings-btn {
+    background: #1a2332;
+    border: 1px solid #3a5070;
+    color: #b0c4d8;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .settings-btn:hover { background: #2d3f55; color: #e8f0f8; }
+</style>
